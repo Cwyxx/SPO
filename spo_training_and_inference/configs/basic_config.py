@@ -37,13 +37,13 @@ def basic_config():
     ###### Compare Function ######
     config.compare_func_cfg = dict(
         type="preference_score_compare",
-        threshold=0.3,
+        threshold=0.0,
     )
     
     ##### dataset #####
     config.dataset_cfg = dict(
         type="PromptDataset",
-        meta_json_path='assets/prompts/4k_training_prompts.json',
+        meta_json_path='assets/prompts/spo_4k.json',
         pretrained_tokenzier_path='laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
     )
     
@@ -62,13 +62,13 @@ def basic_config():
     
     config.sample = sample = ml_collections.ConfigDict()
     # number of sampler inference steps.
-    sample.num_steps = 50 # origin. 20
+    sample.num_steps = 20 # origin. 20
     # eta parameter for the DDIM sampler. this controls the amount of noise injected into the sampling process, with 0.0
     # being fully deterministic and 1.0 being equivalent to the DDPM sampler.
     sample.eta = 1.0
     # classifier-free guidance weight. 1.0 is no guidance.
     sample.guidance_scale = 7.5 # origin 5.0
-    sample.sample_batch_size = 10
+    sample.sample_batch_size = 1 # origin 10
     # number of x_{t-1} sampled at each timestep.
     sample.num_sample_each_step = 4 # origin 2
 
@@ -103,13 +103,13 @@ def basic_config():
     train.eps = 0.1
 
     #### validation ####
-    config.validation_prompts = ['A beautiful lake']
+    config.validation_prompts = ['A woman holding a plate of cake in her hand.']
     config.num_validation_images = 2
     config.eval_interval = 1
     
     #### logging ####
     # run name for wandb logging and checkpoint saving.
-    config.run_name = ""
+    config.run_name = "hpsv2"
     config.wandb_project_name = 'spo'
     config.wandb_entity_name = None
     # top-level logging directory for checkpoint saving.

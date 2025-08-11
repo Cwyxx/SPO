@@ -48,6 +48,7 @@ class PromptDataset(Dataset):
         preference_model_input_ids = torch.cat(preference_model_input_ids, dim=0)
         extra_info = {
             'input_ids': preference_model_input_ids,
+            'prompts': prompts
         }
         input_ids = tokenizer(
             prompts,

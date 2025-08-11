@@ -15,7 +15,7 @@ import json
 
 import tqdm
 import torch
-import wandb
+import swanlab
 
 from absl import app, flags
 from ml_collections import config_flags
@@ -81,7 +81,7 @@ def main(_):
     )
 
     accelerator = Accelerator(
-        log_with="wandb" if not getattr(config, 'debug', False) else None,
+        log_with="swanlab" if not getattr(config, 'debug', False) else None,
         project_config=accelerator_config,
         gradient_accumulation_steps=config.train.gradient_accumulation_steps,
     )
@@ -90,7 +90,7 @@ def main(_):
             accelerator.init_trackers(
                 project_name=config.wandb_project_name, 
                 config=config, 
-                init_kwargs={"wandb": {
+                init_kwargs={"swanlab": {
                     "name": config.run_name, 
                     "entity": config.wandb_entity_name
                 }}
@@ -318,13 +318,14 @@ def main(_):
         train_loss = 0.0
         train_ratio_win = 0.0
         train_ratio_lose = 0.0
-        for dataset_batch_idx, batch in tqdm(
+        data_loader_process_bar = tqdm(
             enumerate(data_loader),
             total=len(data_loader),
             disable=not accelerator.is_local_main_process,
             desc="Batch",
             position=1,
-        ):
+        )
+        for dataset_batch_idx, batch in data_loader_process_bar:
             if (
                 dataset_batch_idx == len(data_loader) - 1 and 
                 accelerator.gradient_state.in_dataloader
@@ -348,11 +349,12 @@ def main(_):
             for k, v in extra_info.items():
                 if isinstance(v, torch.Tensor):
                     other_dim = [1 for _ in range(v.dim() - 1)]
-                    extra_info[k] = v.repeat(config.sample.num_sample_each_step, *other_dim)
+                    extra_info[k] = v.repeat(config.sample.num_sample_each_step, *other_dim) # [B, L] -> [B + B (num_sample_each_step), L]
                 elif isinstance(v, list):
                     extra_info[k] = v * config.sample.num_sample_each_step
                 else:
                     raise ValueError(f"Unknown type {type(v)} for extra_info[{k}]")
+            
             with autocast():
                 (
                     timesteps, 
@@ -406,6 +408,10 @@ def main(_):
                 prompt_embeds = gather_tensor_with_diff_shape(prompt_embeds, local_valid_samples_num_list)
             
             total_valid_samples_num = timesteps.shape[0]
+            
+            data_loader_process_bar.set_postfix({
+                "total_valid_samples_num": total_valid_samples_num
+            })
             
             if total_valid_samples_num < accelerator.num_processes:
                 continue
@@ -665,13 +671,13 @@ def main(_):
                     )
 
                 for tracker in accelerator.trackers:
-                    if tracker.name == "wandb":
+                    if tracker.name == "swanlab":
                         formatted_images = []
                         for log in image_logs:
                             images = log["images"]
                             validation_prompt = log["prompts"]
                             for idx, image in enumerate(images):
-                                image = wandb.Image(image, caption=validation_prompt)
+                                image = swanlab.Image(image, caption=validation_prompt)
                                 formatted_images.append(image)
                         tracker.log({"validation": formatted_images})
                 unet.train()
