@@ -31,24 +31,83 @@ def hpsv2_preference_model_func_builder(cfg):
     hpsv2 = HPSv2()
     hpsv2.eval().to(cfg.device)
     hpsv2.requires_grad_(False)
-    
-    @torch.no_grad()
-    def preference_fn(img, extra_info):
-        img = (img / 2 + 0.5).clamp(0, 1).float()
-        _transform = torchvision.transforms.Compose([
+    _transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(224, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
             torchvision.transforms.CenterCrop(224),
             torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
-            
+    
+    @torch.no_grad()
+    def preference_fn(img, extra_info):
+        img = (img / 2 + 0.5).clamp(0, 1).float()
         img = _transform(img)
         caption = hpsv2.tokenizer(extra_info["prompts"]).to(cfg.device)
         outputs = hpsv2.model(img, caption)
         image_features, text_features = outputs["image_features"], outputs["text_features"]
         logits = image_features @ text_features.T
-        scores = torch.diagonal(logits)
+        scores = torch.diagonal(logits) # reward
         return scores
 
     return preference_fn
 
+@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="imagereward_preference_model_func")
+def imagereward_preference_model_func_builder(cfg):
+    import ImageReward as RM
+    imagereward = RM.load("ImageReward-v1.0", device=cfg.device).eval().requires_grad_(False)
+    _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(224, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
+    
+    @torch.no_grad()
+    def preference_fn(img, extra_info):
+        img = (img / 2 + 0.5).clamp(0, 1).float()
+        image = _transform(image)
         
+        rm_input_ids, rm_attention_masks = [], []
+        for prompt in extra_info['prompts']:
+            tokenizer_dict = imagereward.blip.tokenizer(prompt, padding='max_length', truncation=True, max_length=35, return_tensors="pt")
+            rm_input_ids.append(tokenizer_dict.input_ids)
+            rm_attention_masks.append(tokenizer_dict.attention_mask)
+            
+        rm_input_ids = torch.stack(rm_input_ids)
+        rm_attention_masks = torch.stack(rm_attention_masks)
+        rm_input_ids = rm_input_ids.view(-1, rm_input_ids.shape[-1])
+        rm_attention_mask = rm_attention_mask.view(-1, rm_attention_mask.shape[-1])
+        
+        scores = imagereward.score_grad(rm_input_ids, rm_attention_masks, img) # reward
+        return scores
+    
+    return preference_fn
+
+@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="pickscore_preference_model_func")
+def pickscore_preference_model_func_builder(cfg):
+    from transformers import AutoProcessor, AutoModel
+    processor_name_or_path = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
+    model_pretrained_name_or_path = "yuvalkirstain/PickScore_v1"
+    pickscore_processor = AutoProcessor.from_pretrained(processor_name_or_path)
+    pickscore = AutoModel.from_pretrained(model_pretrained_name_or_path).eval().to(cfg.device).requires_grad_(False)
+    _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(224, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
+    
+    @torch.no_grad()
+    def preference_fn(img, extra_info):
+        img = (img / 2 + 0.5).clamp(0, 1).float()
+        img = _transform(img)
+        
+        text_inputs = pickscore_processor(text=extra_info["prompts"], padding=True, truncation=True, max_length=77, return_tensors="pt")
+        image_embs = pickscore.get_image_features(img)
+        image_embs = image_embs / torch.norm(image_embs, dim=-1, keepdim=True) # [B, embedding_dim]
+        text_embs = pickscore.get_text_features(**text_inputs)
+        text_embs = text_embs / torch.norm(text_embs, dim=-1, keepdim=True) # [B, embedding_dim]
+    
+        logits = pickscore.logit_scale.exp() * text_embs @ image_embs.T # [B, B]
+        scores = torch.diagonal(logits) # [B]
+        
+        return scores
+    
+    return preference_fn

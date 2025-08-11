@@ -44,7 +44,8 @@ def basic_config():
     config.dataset_cfg = dict(
         type="PromptDataset",
         meta_json_path='assets/prompts/spo_4k.json',
-        pretrained_tokenzier_path='laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
+        pretrained_tokenizer_path=config.pretrained.model
+        # origin pretrained_tokenzier_path='laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
     )
     
     ##### dataloader ####
@@ -95,6 +96,8 @@ def basic_config():
     # whether or not to use classifier-free guidance during training. if enabled, the same guidance scale used during
     # sampling will be used during training.
     train.cfg = True
+    train.guidance_scale = 7.5
+    train.eta = 1.0
 
     train.divert_start_step = 4
     # coefficient of the KL divergence
