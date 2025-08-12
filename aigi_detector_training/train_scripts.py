@@ -3,6 +3,7 @@ import argparse
 import torch
 from accelerate import Accelerator
 from univfd import UnivFD
+from dinov2 import Dinov2
 from dataset.albumen_transform import train_real_transform, train_fake_transform, val_real_transform, val_fake_transform
 from tqdm import tqdm
 import random
@@ -30,8 +31,15 @@ def parse_args():
         type=str,
         default="genimage",
         help=(
-            "The experiment name to be passed to Accelerator.init_trackers. "
-            "This is used to identify the current experiment in tracking tools like swanlab. "
+            "The training dataset. "
+        ),
+    )
+    parser.add_argument(
+        "--aigi_detector",
+        type=str,
+        default="dinov2",
+        help=(
+            "The type of aigi detector."
         ),
     )
     parser.add_argument(
@@ -63,8 +71,14 @@ if __name__ == "__main__":
     set_seed(1)
     weight_type = torch.float32
     
-    # Initialize univfd_model:
-    model = UnivFD("openai/clip-vit-large-patch14")
+    # Initialize aigi_detector:
+    if args.aigi_detector == "univfd":
+        # initialize the univfd.
+        model = UnivFD("openai/clip-vit-large-patch14")
+        
+    elif args.aigi_detector == "dinov2":
+        # initialize the dinov2.
+        model = Dinov2("facebook/dinov2-base")
     
     # Initialize the optimizer:
     train_parameters = filter(lambda p: p.requires_grad, model.parameters())
