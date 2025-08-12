@@ -111,3 +111,40 @@ def pickscore_preference_model_func_builder(cfg):
         return scores
     
     return preference_fn
+
+@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="aigi_detector_preference_model_func")
+def aigi_detector_preference_model_func_builder(cfg):
+    import safetensors
+    if cfg.aigi_detector == "univfd":
+        from aigi_detector_training.univfd import UnivFD
+        aigi_detector = UnivFD("openai/clip-vit-large-patch14")
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
+    elif cfg.aigi_detector == "dinov2":
+        from aigi_detector_training.dinov2 import Dinov2
+        aigi_detector = Dinov2("facebook/dinov2-base")
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        
+    ckpt = safetensors.torch.load_file(cfg.aigi_detector_path)
+    aigi_detector.load_state_dict(ckpt)
+    aigi_detector.eval().to(cfg.device).requires_grad_(False)
+    
+    @torch.no_grad
+    def preference_fn(img, extra_info):
+        img = (img / 2 + 0.5).clamp(0, 1).float()
+        img = _transform(img)
+
+        logits = aigi_detector(img)
+        outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
+        scores = 1 - outputs
+        
+        return scores
+    
+    return preference_fn

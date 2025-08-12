@@ -1,0 +1,53 @@
+import ml_collections
+from configs.basic_config import basic_config
+
+def get_config():
+    return exp_config()
+
+def exp_config():
+    config = basic_config()
+    
+    ##### dataset #####
+    config.dataset_cfg = dict(
+        type="PromptDataset",
+        meta_json_path='assets/prompts/spo_4k.json',
+        pretrained_tokenzier_path='laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
+    )
+    
+    ###### Preference Model ######
+    preference_model = "hpsv2"
+    config.preference_model_func_cfg = dict(
+        type=f"{preference_model}_preference_model_func"
+    ) 
+    
+    ###### Aigi Detector ######
+    config.aigi_detector_func_cfg = dict(
+        type=f"aigi_detector_preference_model_func",
+        aigi_detector="univfd",
+        aigi_detector_path="/data_center/data2/dataset/chenwy/21164-data/model-ckpt/univfd/genimage/best_model/model.safetensors"
+    )
+    
+    ###### logging ######
+    # total_batch_size: 1 * 4 * 4
+    config.logdir = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/drtune"
+    config.wandb_project_name = "drtune"
+    config.run_name = f"{preference_model}-drtune" # experiment name under a project (wandb_project_name) in swanlab.
+    
+    ###### Training ######
+    config.max_train_steps = 500
+    config.checkpointing_steps = 50 # Save a checkpoint of the training state every X updates.
+    config.validation_steps = 50 # Run validation every X steps.
+    config.pipeline_num_inference_steps = 50
+    
+    ###### drtune ######
+    config.drtune = drtune = ml_collections.ConfigDict()
+    drtune.K = 5 # number of training time steps (denoisign time steps)
+    drtune.T = 50 # Total number of denoising steps used during finetuning.
+    drtune.M = 20 # Maximal early stop step m.
+    
+    #### validation ####
+    config.validation_prompts = ['A woman holding a plate of cake in her hand.', "cat", "dog"]
+    config.num_validation_images = 1
+    config.eval_interval = 1
+
+    return config

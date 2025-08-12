@@ -44,7 +44,7 @@ def basic_config():
     config.dataset_cfg = dict(
         type="PromptDataset",
         meta_json_path='assets/prompts/spo_4k.json',
-        pretrained_tokenizer_path=config.pretrained.model
+        pretrained_tokenzier_path='laion/CLIP-ViT-H-14-laion2B-s32B-b79K'
         # origin pretrained_tokenzier_path='laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
     )
     

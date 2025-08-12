@@ -3,12 +3,11 @@ import os
 import os.path as osp
 import sys
 # Add the project directory to the Python path to simplify imports without manually setting PYTHONPATH.
-current_dir = osp.dirname(osp.abspath(__file__)) # train_scripts
-parent_dir = osp.abspath(osp.join(current_dir, "..")) # training_and_inference
-sys.path.insert(0, parent_dir)
-grandparent_dir = osp.abspath(osp.join(current_dir, "..", "..")) # SPO
-sys.path.insert(0, grandparent_dir)
-
+sys.path.insert(
+    0, osp.abspath(
+        osp.join(osp.dirname(osp.abspath(__file__)), "..")
+    ),
+)
 import copy
 import contextlib
 import math
@@ -134,8 +133,6 @@ def main(_):
     pipeline.scheduler.alphas_cumprod = pipeline.scheduler.alphas_cumprod.to(accelerator.device)
     
     preference_model_fn = get_preference_model_func(config.preference_model_func_cfg, accelerator.device)
-    if hasattr(config, 'aigi_detector_func_cfg'):
-        aigi_detector_fn = get_preference_model_func()
 
     # Move unet, vae and text_encoder to device and cast to inference_dtype
     pipeline.vae.to(accelerator.device, dtype=inference_dtype)
