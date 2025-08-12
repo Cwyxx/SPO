@@ -135,7 +135,7 @@ def main(_):
     
     preference_model_fn = get_preference_model_func(config.preference_model_func_cfg, accelerator.device)
     if hasattr(config, 'aigi_detector_func_cfg'):
-        aigi_detector_fn = get_preference_model_func()
+        aigi_detector_fn = get_preference_model_func(config.aigi_detector_func_cfg, accelerator.device)
 
     # Move unet, vae and text_encoder to device and cast to inference_dtype
     pipeline.vae.to(accelerator.device, dtype=inference_dtype)
@@ -285,6 +285,10 @@ def main(_):
     logger.info(f"  Training batch size per device = {config.train.train_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {config.train.gradient_accumulation_steps}")
     logger.info(f"  Do Classifier Free Guidance = {config.train.cfg}")
+    if hasattr(config, 'aigi_detector_func_cfg'):
+        logger.info(f"  Aigi Detector Weight: {config.aigi_detector_weight}")
+        logger.info(f"  Aigi Detector: {config.aigi_detector_func_cfg.aigi_detector}")
+        logger.info(f"  Aigi Detector Path: {config.aigi_detector_func_cfg.aigi_detector_path}")
     logger.info("")
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
 
@@ -315,6 +319,8 @@ def main(_):
         position=1,
     ):
         train_scores, train_backward_loss = 0.0, 0.0
+        if hasattr(config, "aigi_detector_func_cfg"):
+            train_aigi_scores = 0.0
         
         data_loader_process_bar = tqdm(
             enumerate(data_loader),
@@ -332,7 +338,7 @@ def main(_):
             T = config.drtune.T
             M = config.drtune.M
             interval = T // K
-            s = random.randint(0, T - K * interval) if T % K != 0 else random.randint(0, T - (K-1) * interval)
+            s = random.randint(0, T - K * interval - 1) if T % K != 0 else random.randint(0, T - (K-1) * interval - 1)
             train_timestep_indices = [ s + i * interval for i in range(0, K)]
             t_min = random.randint(1, M) # range of early stop timestep M.
             
@@ -452,11 +458,20 @@ def main(_):
                 
                 scores = preference_model_fn(pred_x0, batch['extra_info']).mean()
                 backward_loss = -scores
+                
+                if hasattr(config, "aigi_detector_func_cfg"):
+                    aigi_detector_scores = aigi_detector_fn(pred_x0, batch['extra_info']).mean()
+                    backward_loss = (1 - config.aigi_detector_weight) * (-scores) +  config.aigi_detector_weight * (-aigi_detector_scores)
 
                 avg_scores = accelerator.reduce(scores.detach(), reduction="mean")
                 avg_backward_loss = accelerator.reduce(backward_loss.detach(), reduction="mean")
+                
                 train_scores += avg_scores / accelerator.gradient_accumulation_steps
                 train_backward_loss += avg_backward_loss / accelerator.gradient_accumulation_steps
+                
+                if hasattr(config, "aigi_detector_func_cfg"):
+                    avg_aigi_detector_scores = accelerator.reduce(aigi_detector_scores.detach(), reduction="mean")
+                    train_aigi_detector_scores += avg_aigi_detector_scores / accelerator.gradient_accumulation_steps
 
                 # backward pass
                 accelerator.backward(backward_loss)
@@ -474,6 +489,11 @@ def main(_):
                     "train_backward_loss": train_backward_loss,
                     "lr": optimizer.param_groups[0]['lr'],
                 }
+                
+                if hasattr(config, "aigi_detector_func_cfg"):
+                    info["train_aigi_detector_socres"] = train_aigi_detector_scores
+                    train_aigi_detector_scores = 0.0
+                    
                 accelerator.log(info, step=global_step)
                 global_step += 1
                 train_scores, train_backward_loss = 0.0, 0.0
@@ -526,7 +546,7 @@ def main(_):
                                     image = swanlab.Image(image, caption=validation_prompt)
                                     formatted_images.append(image)
                             tracker.log({"validation": formatted_images})
-                    unet.train()
+                    
                     pipeline.unet.train()
                     torch.cuda.empty_cache()
     

@@ -21,9 +21,11 @@ def exp_config():
     ) 
     
     ###### Aigi Detector ######
+    aigi_detector = "univfd"
+    config.aigi_detector_weight = 0.1
     config.aigi_detector_func_cfg = dict(
         type=f"aigi_detector_preference_model_func",
-        aigi_detector="univfd",
+        aigi_detector=f"{aigi_detector}",
         aigi_detector_path="/data_center/data2/dataset/chenwy/21164-data/model-ckpt/univfd/genimage/best_model/model.safetensors"
     )
     
@@ -31,12 +33,10 @@ def exp_config():
     # total_batch_size: 1 * 4 * 4
     config.logdir = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/drtune"
     config.wandb_project_name = "drtune"
-    config.run_name = f"{preference_model}-drtune" # experiment name under a project (wandb_project_name) in swanlab.
+    config.run_name = f"drtune-{preference_model}_{1-config.aigi_detector_weight}-{aigi_detector}_{config.aigi_detector_weight}" # experiment name under a project (wandb_project_name) in swanlab.
     
     ###### Training ######
     config.max_train_steps = 500
-    config.checkpointing_steps = 50 # Save a checkpoint of the training state every X updates.
-    config.validation_steps = 50 # Run validation every X steps.
     config.pipeline_num_inference_steps = 50
     
     ###### drtune ######
@@ -46,8 +46,9 @@ def exp_config():
     drtune.M = 20 # Maximal early stop step m.
     
     #### validation ####
-    config.validation_prompts = ['A woman holding a plate of cake in her hand.', "cat", "dog"]
+    config.validation_prompts = ['A woman holding a plate of cake in her hand.', 'A man sitting on top of a couch on a wooden floor.' ]
+    config.checkpointing_steps = 50 # Save a checkpoint of the training state every X updates.
+    config.validation_steps = 50 # Run validation every X steps.
     config.num_validation_images = 1
-    config.eval_interval = 1
 
     return config
