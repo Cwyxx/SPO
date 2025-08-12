@@ -29,7 +29,7 @@ def exp_config():
     ###### Training ######
     config.max_train_steps = 500
     config.checkpointing_steps = 50 # Save a checkpoint of the training state every X updates.
-    config.validation_epochs = 50 # Run validation every X epochs.
+    config.validation_steps = 50 # Run validation every X steps.
     config.pipeline_num_inference_steps = 50
     
     ###### drtune ######
@@ -37,5 +37,10 @@ def exp_config():
     drtune.K = 5 # number of training time steps (denoisign time steps)
     drtune.T = 50 # Total number of denoising steps used during finetuning.
     drtune.M = 20 # Maximal early stop step m.
+    
+    #### validation ####
+    config.validation_prompts = ['A woman holding a plate of cake in her hand.', "cat", "dog"]
+    config.num_validation_images = 1
+    config.eval_interval = 1
 
     return config

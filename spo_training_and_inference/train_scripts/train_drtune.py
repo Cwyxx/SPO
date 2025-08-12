@@ -122,6 +122,7 @@ def main(_):
     # freeze parameters of models to save more memory
     pipeline.vae.requires_grad_(False)
     pipeline.text_encoder.requires_grad_(False)
+    unet = pipeline.unet
     if config.use_checkpointing:
         unet.enable_gradient_checkpointing()
     # disable safety checker
@@ -310,8 +311,7 @@ def main(_):
         desc="Epoch",
         position=1,
     ):
-        train_loss = 0.0
-        train_reward = 0.0
+        train_scores, train_backward_loss = 0.0, 0.0
         
         data_loader_process_bar = tqdm(
             enumerate(data_loader),
@@ -331,8 +331,7 @@ def main(_):
             interval = T // K
             s = random.randint(0, T - K * interval) if T % K != 0 else random.randint(0, T - (K-1) * interval)
             train_timestep_indices = [ s + i * interval for i in range(0, K)]
-            t_min = random.randint(1, M)
-            
+            t_min = random.randint(1, M) # range of early stop timestep M.
             
             # ############ pre-define the parameters of stable_diffusion_pipeline.__call__ ############
             prompt, negative_prompt, generator, latents, cross_attention_kwargs = None, None, None, None, None
@@ -440,102 +439,93 @@ def main(_):
                             if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % pipeline.scheduler.order == 0):
                                 progress_bar.update()
                                 
-                            if t <= t_min:
+                            if num_inference_steps - i == t_min:
                                 break
-                                
-                                
-                    # clip the Q value
-                    ratio_0 = torch.clamp(torch.exp(total_prob_0-total_ref_prob_0),1 - config.train.eps, 1 + config.train.eps)
-                    ratio_1 = torch.clamp(torch.exp(total_prob_1-total_ref_prob_1),1 - config.train.eps, 1 + config.train.eps)
-                    loss = -torch.log(torch.sigmoid(config.train.beta*(torch.log(ratio_0)) - config.train.beta*(torch.log(ratio_1)))).mean()
                     
-                    avg_loss = accelerator.reduce(loss.detach(), reduction='mean')
-                    train_loss += avg_loss.item() / accelerator.gradient_accumulation_steps
-                    
-                    # batch size              
-                    win_ratio_sum =  accelerator.reduce(ratio_0.detach(), reduction='sum')       
-                    lose_ratio_sum =  accelerator.reduce(ratio_1.detach(), reduction='sum')       
-                    
-                    avg_win_ratio = (win_ratio_sum.sum() / (win_ratio_sum.shape[0] * accelerator.num_processes)).item()
-                    avg_lose_ratio = (lose_ratio_sum.sum() / (lose_ratio_sum.shape[0] * accelerator.num_processes)).item()
-
-                    train_ratio_win += avg_win_ratio / accelerator.gradient_accumulation_steps
-                    train_ratio_lose += avg_lose_ratio / accelerator.gradient_accumulation_steps
-
-                    # backward pass
-                    accelerator.backward(loss)
-                    if accelerator.sync_gradients:
-                        accelerator.clip_grad_norm_(trainable_para, config.train.max_grad_norm)
-                    optimizer.step()
-                    optimizer.zero_grad()
+                # translate latent to image.
+                pred_original_sample = pred_original_sample / pipeline.vae.config.scaling_factor  
+                pred_x0 = pipeline.vae.decode(pred_original_sample.to(pipeline.vae.dtype)).sample
+                pred_x0 = (pred_x0 / 2 + 0.5).clamp(0, 1).float()
                 
+                scores = preference_model_fn(pred_x0, batch['extra_info']).mean()
+                backward_loss = -scores
+
+                avg_scores = accelerator.reduce(scores.detach(), reduction="mean")
+                avg_backward_loss = accelerator.reduce(backward_loss.detach(), reduction="mean")
+                train_scores += avg_scores / accelerator.gradient_accumulation_steps
+                train_backward_loss += avg_backward_loss / accelerator.gradient_accumulation_steps
+
+                # backward pass
+                accelerator.backward(backward_loss)
                 if accelerator.sync_gradients:
-                    # log training-related stuff
-                    info = {
-                        "epoch": epoch, 
-                        "global_step": global_step, 
-                        "train_loss": train_loss,
-                        "train_ratio_win": train_ratio_win,
-                        "train_ratio_lose": train_ratio_lose,
-                        "lr": optimizer.param_groups[0]['lr'],
-                    }
-                    accelerator.log(info, step=global_step)
-                    global_step += 1
-                    train_loss = 0.0
-                    train_ratio_win = 0.0
-                    train_ratio_lose = 0.0
+                    accelerator.clip_grad_norm_(trainable_para, config.train.max_grad_norm)
+                optimizer.step()
+                optimizer.zero_grad()
+                
+            if accelerator.sync_gradients:
+                # log training-related stuff
+                info = {
+                    "epoch": epoch, 
+                    "global_step": global_step, 
+                    "train_scores": train_scores,
+                    "train_backward_loss": train_backward_loss,
+                    "lr": optimizer.param_groups[0]['lr'],
+                }
+                accelerator.log(info, step=global_step)
+                global_step += 1
+                train_scores, train_backward_loss = 0.0, 0.0
 
             
-        ########## save ckpt and evaluation ##########
-        if accelerator.is_main_process:
-            if (epoch + 1) % config.save_interval == 0:
-                accelerator.save_state(os.path.join(config.logdir, config.run_name, f'checkpoint_{epoch}'))
-                with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{epoch}', 'global_step.json'), 'w') as f:
-                    json.dump({'global_step': global_step}, f)
-            if  (epoch + 1) % config.eval_interval == 0 and config.validation_prompts is not None:
-                prompt_info = f"Running validation... \n Generating {config.num_validation_images} images with prompt:\n"
-                for prompt in config.validation_prompts:
-                    prompt_info = prompt_info + prompt + '\n'
+            ########## save ckpt and evaluation ##########
+            if accelerator.is_main_process:
+                if global_step % config.checkpointing_steps == 0:
+                    accelerator.save_state(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}'))
+                    with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}', 'global_step.json'), 'w') as f:
+                        json.dump({'global_step': global_step}, f)
+                        
+                if global_step % config.validation_steps == 0 and config.validation_prompts is not None:
+                    prompt_info = f"Running validation... \n Generating {config.num_validation_images} images with prompt:\n"
+                    for prompt in config.validation_prompts:
+                        prompt_info = prompt_info + prompt + '\n'
 
-                logger.info(prompt_info)
-                # create pipeline
-                unet.eval()
-                pipeline.unet.eval()
-                # run inference
-                generator = torch.Generator(device=accelerator.device).manual_seed(config.seed) if config.seed else None
+                    logger.info(prompt_info)
+                    # create pipeline
+                    pipeline.unet.eval()
+                    # run inference
+                    generator = torch.Generator(device=accelerator.device).manual_seed(config.seed) if config.seed else None
 
-                image_logs = []
-                for idx, validation_prompt in enumerate(config.validation_prompts):
-                    with torch.cuda.amp.autocast():
-                        images = [
-                            pipeline(
-                                prompt=validation_prompt,
-                                num_inference_steps=config.sample.num_steps,
-                                generator=generator,
-                                guidance_scale=config.sample.guidance_scale,
-                            ).images[0]
-                            for _ in range(config.num_validation_images)
-                        ]
-                    image_logs.append(
-                        {
-                            "images": images, 
-                            "prompts": validation_prompt,
-                        }
-                    )
+                    image_logs = []
+                    for idx, validation_prompt in enumerate(config.validation_prompts):
+                        with torch.cuda.amp.autocast():
+                            images = [
+                                pipeline(
+                                    prompt=validation_prompt,
+                                    num_inference_steps=config.pipeline_num_inference_steps,
+                                    generator=generator,
+                                    guidance_scale=config.sample.guidance_scale,
+                                ).images[0]
+                                for _ in range(config.num_validation_images)
+                            ]
+                        image_logs.append(
+                            {
+                                "images": images, 
+                                "prompts": validation_prompt,
+                            }
+                        )
 
-                for tracker in accelerator.trackers:
-                    if tracker.name == "swanlab":
-                        formatted_images = []
-                        for log in image_logs:
-                            images = log["images"]
-                            validation_prompt = log["prompts"]
-                            for idx, image in enumerate(images):
-                                image = swanlab.Image(image, caption=validation_prompt)
-                                formatted_images.append(image)
-                        tracker.log({"validation": formatted_images})
-                unet.train()
-                pipeline.unet.train()
-                torch.cuda.empty_cache()
+                    for tracker in accelerator.trackers:
+                        if tracker.name == "swanlab":
+                            formatted_images = []
+                            for log in image_logs:
+                                images = log["images"]
+                                validation_prompt = log["prompts"]
+                                for idx, image in enumerate(images):
+                                    image = swanlab.Image(image, caption=validation_prompt)
+                                    formatted_images.append(image)
+                            tracker.log({"validation": formatted_images})
+                    unet.train()
+                    pipeline.unet.train()
+                    torch.cuda.empty_cache()
     
     # Save the lora layers
     accelerator.wait_for_everyone()
