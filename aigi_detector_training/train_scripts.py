@@ -4,7 +4,7 @@ import torch
 from accelerate import Accelerator
 from univfd import UnivFD
 from dinov2 import Dinov2
-from dataset.albumen_transform import train_real_transform, train_fake_transform, val_real_transform, val_fake_transform
+from dataset.albumen_transform import univfd_transform, dinov2_transform
 from tqdm import tqdm
 import random
 import numpy as np
@@ -81,8 +81,8 @@ if __name__ == "__main__":
         model = Dinov2("facebook/dinov2-base")
     
     # Initialize the optimizer:
-    train_parameters = filter(lambda p: p.requires_grad, model.parameters())
-    accelerator.print(f"trainable parameters: {train_parameters}, num: {len(train_parameters)}")
+    train_parameters = [p for p in model.parameters() if p.requires_grad]
+    accelerator.print(f"trainable parameters:\n\t{train_parameters}\nnum:\n\t{len(train_parameters)}")
     optimizer = torch.optim.AdamW(
         train_parameters,
         lr=args.learning_rate,
@@ -92,6 +92,18 @@ if __name__ == "__main__":
     )
     
     # Initialize the dataloader:
+    if args.aigi_detector == "univfd":
+        train_real_transform, train_fake_transform = univfd_transform["train_real_transform"], univfd_transform["train_fake_transform"]
+        val_real_transform, val_fake_transform = univfd_transform["val_real_transform"], univfd_transform["val_fake_transform"]
+    elif args.aigi_detector == "dinov2":
+        train_real_transform, train_fake_transform = dinov2_transform["train_real_transform"], dinov2_transform["train_fake_transform"]
+        val_real_transform, val_fake_transform = dinov2_transform["val_real_transform"], dinov2_transform["val_fake_transform"]
+        
+    accelerator.print(f"train_real_transform: {train_real_transform}")
+    accelerator.print(f"train_fake_transform: {train_fake_transform}")
+    accelerator.print(f"val_real_transform: {val_real_transform}")
+    accelerator.print(f"val_fake_transform: {val_fake_transform}")
+    
     if args.dataset_name == "genimage":
         from dataset.genimage import Genimage
         image_dir = "/data_center/data2/dataset/chenwy/21164-data/genimage"

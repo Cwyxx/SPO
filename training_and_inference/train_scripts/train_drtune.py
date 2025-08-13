@@ -553,7 +553,7 @@ def main(_):
                                 for idx, image in enumerate(images):
                                     image = swanlab.Image(image, caption=validation_prompt)
                                     formatted_images.append(image)
-                            tracker.log({"validation": formatted_images})
+                            tracker.log({"validation": formatted_images}, step=global_step)
                     
                     pipeline.unet.train()
                     torch.cuda.empty_cache()
