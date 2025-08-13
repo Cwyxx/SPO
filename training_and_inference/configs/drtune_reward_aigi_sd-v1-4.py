@@ -15,7 +15,7 @@ def exp_config():
     )
     
     ###### Preference Model ######
-    preference_model = "hpsv2"
+    preference_model = "pickscore"
     config.preference_model_func_cfg = dict(
         type=f"{preference_model}_preference_model_func"
     ) 
@@ -31,7 +31,7 @@ def exp_config():
     
     ###### logging ######
     # total_batch_size: 1 * 4 * 4
-    config.logdir = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/drtune"
+    config.logdir = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k"
     config.wandb_project_name = "drtune"
     config.run_name = f"drtune-{preference_model}_{1-config.aigi_detector_weight}-{aigi_detector}_{config.aigi_detector_weight}" # experiment name under a project (wandb_project_name) in swanlab.
     

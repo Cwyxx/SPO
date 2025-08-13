@@ -94,12 +94,11 @@ def pickscore_preference_model_func_builder(cfg):
             torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
     
-    @torch.no_grad()
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()
         img = _transform(img)
         
-        text_inputs = pickscore_processor(text=extra_info["prompts"], padding=True, truncation=True, max_length=77, return_tensors="pt")
+        text_inputs = pickscore_processor(text=extra_info["prompts"], padding=True, truncation=True, max_length=77, return_tensors="pt").to(cfg.device)
         image_embs = pickscore.get_image_features(img)
         image_embs = image_embs / torch.norm(image_embs, dim=-1, keepdim=True) # [B, embedding_dim]
         text_embs = pickscore.get_text_features(**text_inputs)
@@ -136,7 +135,6 @@ def aigi_detector_preference_model_func_builder(cfg):
     aigi_detector.load_state_dict(ckpt)
     aigi_detector.eval().to(cfg.device).requires_grad_(False)
     
-    @torch.no_grad
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()
         img = _transform(img)

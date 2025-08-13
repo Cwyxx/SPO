@@ -128,6 +128,14 @@ def main(_):
         unet.enable_gradient_checkpointing()
     # disable safety checker
     pipeline.safety_checker = None
+    # make the progress bar nicer
+    pipeline.set_progress_bar_config(
+        position=3,
+        disable=not accelerator.is_local_main_process,
+        leave=False,
+        desc="Sampling Timestep",
+        dynamic_ncols=True,
+    )
     
     # switch to DDIM scheduler
     pipeline.scheduler = DDIMScheduler.from_config(pipeline.scheduler.config)
@@ -320,7 +328,7 @@ def main(_):
     ):
         train_scores, train_backward_loss = 0.0, 0.0
         if hasattr(config, "aigi_detector_func_cfg"):
-            train_aigi_scores = 0.0
+            train_aigi_detector_scores = 0.0
         
         data_loader_process_bar = tqdm(
             enumerate(data_loader),
@@ -356,7 +364,7 @@ def main(_):
             prompt_ids = batch['input_ids']
             # encode prompts
             prompt_embeds = pipeline.text_encoder(prompt_ids)[0]
-            sample_neg_prompt_embeds = neg_prompt_embed.repeat(batch_size, 1, 1)
+            negative_prompt_embeds = neg_prompt_embed.repeat(batch_size, 1, 1)
             
             # 0. Default height and width to unet
             height = pipeline.unet.config.sample_size * pipeline.vae_scale_factor
@@ -364,7 +372,7 @@ def main(_):
             
             # 1. Check inputs. Raise error if not correct
             pipeline.check_inputs(prompt=prompt, height=height, width=width, callback_steps=callback_steps, negative_prompt=negative_prompt, 
-                                    prompt_embeds=prompt_embeds, negative_prompt_embeds=sample_neg_prompt_embeds)
+                                    prompt_embeds=prompt_embeds, negative_prompt_embeds=negative_prompt_embeds)
             
             # 2. Define call parameters
             batch_size = prompt_embeds.shape[0]
@@ -454,14 +462,13 @@ def main(_):
                 # translate latent to image.
                 pred_original_sample = pred_original_sample / pipeline.vae.config.scaling_factor  
                 pred_x0 = pipeline.vae.decode(pred_original_sample.to(pipeline.vae.dtype)).sample
-                pred_x0 = (pred_x0 / 2 + 0.5).clamp(0, 1).float()
                 
                 scores = preference_model_fn(pred_x0, batch['extra_info']).mean()
-                backward_loss = -scores
+                backward_loss = -1 * scores
                 
                 if hasattr(config, "aigi_detector_func_cfg"):
                     aigi_detector_scores = aigi_detector_fn(pred_x0, batch['extra_info']).mean()
-                    backward_loss = (1 - config.aigi_detector_weight) * (-scores) +  config.aigi_detector_weight * (-aigi_detector_scores)
+                    backward_loss = (1 - config.aigi_detector_weight) * (-1 * scores) +  config.aigi_detector_weight * (-1 * aigi_detector_scores)
 
                 avg_scores = accelerator.reduce(scores.detach(), reduction="mean")
                 avg_backward_loss = accelerator.reduce(backward_loss.detach(), reduction="mean")
@@ -496,17 +503,18 @@ def main(_):
                     
                 accelerator.log(info, step=global_step)
                 global_step += 1
+                train_step_progress_bar.update(1)
                 train_scores, train_backward_loss = 0.0, 0.0
 
             
             ########## save ckpt and evaluation ##########
             if accelerator.is_main_process:
-                if global_step % config.checkpointing_steps == 0:
+                if global_step > 0 and global_step % config.checkpointing_steps == 0:
                     accelerator.save_state(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}'))
                     with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}', 'global_step.json'), 'w') as f:
                         json.dump({'global_step': global_step}, f)
                         
-                if global_step % config.validation_steps == 0 and config.validation_prompts is not None:
+                if global_step > 0 and global_step % config.validation_steps == 0 and config.validation_prompts is not None:
                     prompt_info = f"Running validation... \n Generating {config.num_validation_images} images with prompt:\n"
                     for prompt in config.validation_prompts:
                         prompt_info = prompt_info + prompt + '\n'
