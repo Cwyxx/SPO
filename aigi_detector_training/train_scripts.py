@@ -60,7 +60,9 @@ def parse_args():
     parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
     parser.add_argument("--adam_epsilon", type=float, default=1e-08, help="Epsilon value for the Adam optimizer")
     parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-    parser.add_argument("--epochs", default=10, type=int)
+    parser.add_argument("--resume_from", default=None, type=str)
+    parser.add_argument("--first_epoch", default=0, type=int)
+    parser.add_argument("--epochs", default=5, type=int)
     args = parser.parse_args()
     return args
 
@@ -125,7 +127,11 @@ if __name__ == "__main__":
     BCELoss = torch.nn.BCEWithLogitsLoss()
     best_metric = 0.0
     
-    for epoch in range(args.epochs):
+    if args.resume_from is not None:
+        accelerator.print(f"Resuming from {args.resume_from}")
+        accelerator.load_state(args.resume_from)
+    
+    for epoch in range(args.first_epoch, args.epochs):
         model.train()
         total_train_loss = 0.0
         progress_bar = tqdm(train_dataloader, 
