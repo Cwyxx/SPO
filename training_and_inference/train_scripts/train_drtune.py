@@ -508,56 +508,56 @@ def main(_):
                 train_scores, train_backward_loss = 0.0, 0.0
 
             
-                ########## save ckpt and evaluation ##########
-                if accelerator.is_main_process:
-                    if global_step > 0 and global_step % config.checkpointing_steps == 0:
-                        accelerator.save_state(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}'))
-                        with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}', 'global_step.json'), 'w') as f:
-                            json.dump({'global_step': global_step}, f)
-                            
-                    if global_step > 0 and global_step % config.validation_steps == 0 and config.validation_prompts is not None:
-                        prompt_info = f"Running validation... \n Generating {config.num_validation_images} images with prompt:\n"
-                        for prompt in config.validation_prompts:
-                            prompt_info = prompt_info + prompt + '\n'
+        ########## save ckpt and evaluation ##########
+        if accelerator.is_main_process:
+            if (epoch + 1) % config.save_interval == 0:
+                accelerator.save_state(os.path.join(config.logdir, config.run_name, f'checkpoint_{epoch}'))
+                with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}', 'global_step.json'), 'w') as f:
+                    json.dump({'global_step': global_step}, f)
+                    
+            if (epoch + 1) % config.eval_interval == 0 and config.validation_prompts is not None:
+                prompt_info = f"Running validation... \n Generating {config.num_validation_images} images with prompt:\n"
+                for prompt in config.validation_prompts:
+                    prompt_info = prompt_info + prompt + '\n'
 
-                        logger.info(prompt_info)
-                        # create pipeline
-                        pipeline.unet.eval()
-                        # run inference
-                        generator = torch.Generator(device=accelerator.device).manual_seed(config.seed) if config.seed else None
+                logger.info(prompt_info)
+                # create pipeline
+                pipeline.unet.eval()
+                # run inference
+                generator = torch.Generator(device=accelerator.device).manual_seed(config.seed) if config.seed else None
 
-                        image_logs = []
-                        for idx, validation_prompt in enumerate(config.validation_prompts):
-                            with torch.cuda.amp.autocast():
-                                images = [
-                                    pipeline(
-                                        prompt=validation_prompt,
-                                        num_inference_steps=config.pipeline_num_inference_steps,
-                                        generator=generator,
-                                        guidance_scale=config.sample.guidance_scale,
-                                    ).images[0]
-                                    for _ in range(config.num_validation_images)
-                                ]
-                            image_logs.append(
-                                {
-                                    "images": images, 
-                                    "prompts": validation_prompt,
-                                }
-                            )
+                image_logs = []
+                for idx, validation_prompt in enumerate(config.validation_prompts):
+                    with torch.cuda.amp.autocast():
+                        images = [
+                            pipeline(
+                                prompt=validation_prompt,
+                                num_inference_steps=config.pipeline_num_inference_steps,
+                                generator=generator,
+                                guidance_scale=config.sample.guidance_scale,
+                            ).images[0]
+                            for _ in range(config.num_validation_images)
+                        ]
+                    image_logs.append(
+                        {
+                            "images": images, 
+                            "prompts": validation_prompt,
+                        }
+                    )
 
-                        for tracker in accelerator.trackers:
-                            if tracker.name == "swanlab":
-                                formatted_images = []
-                                for log in image_logs:
-                                    images = log["images"]
-                                    validation_prompt = log["prompts"]
-                                    for idx, image in enumerate(images):
-                                        image = swanlab.Image(image, caption=validation_prompt)
-                                        formatted_images.append(image)
-                                tracker.log({"validation": formatted_images}, step=global_step)
-                        
-                        pipeline.unet.train()
-                        torch.cuda.empty_cache()
+                for tracker in accelerator.trackers:
+                    if tracker.name == "swanlab":
+                        formatted_images = []
+                        for log in image_logs:
+                            images = log["images"]
+                            validation_prompt = log["prompts"]
+                            for idx, image in enumerate(images):
+                                image = swanlab.Image(image, caption=validation_prompt)
+                                formatted_images.append(image)
+                        tracker.log({"validation": formatted_images}, step=global_step)
+                
+                pipeline.unet.train()
+                torch.cuda.empty_cache()
     
     # Save the lora layers
     accelerator.wait_for_everyone()
