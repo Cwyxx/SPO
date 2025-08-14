@@ -286,7 +286,6 @@ def main(_):
     
     logger.info("***** Running training *****")
     logger.info(f"  Num Epochs = {config.num_epochs}")
-    logger.info(f"  Max Train Steps = {config.max_train_steps}")
     logger.info(f"  Sampling batch size per device = {config.sample.sample_batch_size}")
     logger.info(f"  Training batch size per device = {config.train.train_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {config.train.gradient_accumulation_steps}")
@@ -501,7 +500,7 @@ def main(_):
         if accelerator.is_main_process:
             if (epoch + 1) % config.save_interval == 0:
                 accelerator.save_state(os.path.join(config.logdir, config.run_name, f'checkpoint_{epoch}'))
-                with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}', 'global_step.json'), 'w') as f:
+                with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{epoch}', 'global_step.json'), 'w') as f:
                     json.dump({'global_step': global_step}, f)
                     
             if (epoch + 1) % config.eval_interval == 0 and config.validation_prompts is not None:

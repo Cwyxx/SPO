@@ -27,6 +27,7 @@ def exp_config():
     config.run_name = f"{config.wandb_project_name}-{preference_model}" # experiment name under a project (wandb_project_name) in swanlab.
     
     ###### Training ######
+    config.resume_from = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/drtune_cfg-hpsv2/checkpoint_1"
     config.num_epochs = 5
     config.pipeline_num_inference_steps = 50
     
