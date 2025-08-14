@@ -27,10 +27,7 @@ def exp_config():
     config.run_name = f"{config.wandb_project_name}-{preference_model}" # experiment name under a project (wandb_project_name) in swanlab.
     
     ###### Training ######
-    config.num_epochs = None
-    config.max_train_steps = 500
-    config.checkpointing_steps = 50 # Save a checkpoint of the training state every X updates.
-    config.validation_steps = 50 # Run validation every X steps.
+    config.num_epochs = 5
     config.pipeline_num_inference_steps = 50
     
     ###### drtune ######

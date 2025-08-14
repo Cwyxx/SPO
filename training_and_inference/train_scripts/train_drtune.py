@@ -130,7 +130,7 @@ def main(_):
     pipeline.safety_checker = None
     # make the progress bar nicer
     pipeline.set_progress_bar_config(
-        position=3,
+        position=2,
         disable=not accelerator.is_local_main_process,
         leave=False,
         desc="Sampling Timestep",
@@ -283,8 +283,6 @@ def main(_):
     total_train_batch_size = (
         config.train.train_batch_size * accelerator.num_processes * config.train.gradient_accumulation_steps
     )
-    num_update_steps_per_epoch = math.ceil(len(data_loader) / config.train.gradient_accumulation_steps)
-    config.num_epochs = math.ceil(config.max_train_steps / num_update_steps_per_epoch)
     
     logger.info("***** Running training *****")
     logger.info(f"  Num Epochs = {config.num_epochs}")
@@ -310,21 +308,13 @@ def main(_):
         first_epoch = 0
         global_step = 0
     
-    train_step_progress_bar = tqdm(
-            range(0, config.max_train_steps),
-            total=config.max_train_steps,
-            initial=global_step,
-            disable=not accelerator.is_local_main_process,
-            desc="Train steps",
-            position=0)
-    
     for epoch in tqdm(
         range(first_epoch, config.num_epochs),
         total=config.num_epochs,
         initial=first_epoch,
         disable=not accelerator.is_local_main_process,
         desc="Epoch",
-        position=1,
+        position=0,
     ):
         train_scores, train_backward_loss = 0.0, 0.0
         if hasattr(config, "aigi_detector_func_cfg"):
@@ -335,7 +325,7 @@ def main(_):
             total=len(data_loader),
             disable=not accelerator.is_local_main_process,
             desc="Batch",
-            position=2,
+            position=1,
         )
         for dataset_batch_idx, batch in data_loader_process_bar:
             ############ Training ############
@@ -504,7 +494,6 @@ def main(_):
                     
                 accelerator.log(info, step=global_step)
                 global_step += 1
-                train_step_progress_bar.update(1)
                 train_scores, train_backward_loss = 0.0, 0.0
 
             
