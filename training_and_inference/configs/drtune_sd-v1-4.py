@@ -22,11 +22,12 @@ def exp_config():
     
     ###### logging ######
     # total_batch_size: 1 * 4 * 4
-    config.logdir = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/drtune"
-    config.wandb_project_name = "drtune"
-    config.run_name = f"{preference_model}-drtune" # experiment name under a project (wandb_project_name) in swanlab.
+    config.wandb_project_name = "drtune_cfg"
+    config.logdir = f"/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k"
+    config.run_name = f"{config.wandb_project_name}-{preference_model}" # experiment name under a project (wandb_project_name) in swanlab.
     
     ###### Training ######
+    config.num_epochs = None
     config.max_train_steps = 500
     config.checkpointing_steps = 50 # Save a checkpoint of the training state every X updates.
     config.validation_steps = 50 # Run validation every X steps.
@@ -39,8 +40,7 @@ def exp_config():
     drtune.M = 20 # Maximal early stop step m.
     
     #### validation ####
-    config.validation_prompts = ['A woman holding a plate of cake in her hand.', "cat", "dog"]
+    config.validation_prompts = [ 'a cat.', 'a dog', 'a horse.', 'A bus stopped on the side of the road while people board it.', 'A woman holding a plate of cake in her hand.']
     config.num_validation_images = 1
-    config.eval_interval = 1
 
     return config

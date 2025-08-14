@@ -390,6 +390,7 @@ def main(_):
                 negative_prompt_embeds=negative_prompt_embeds,
                 lora_scale=text_encoder_lora_scale,
             )
+            
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
@@ -436,9 +437,6 @@ def main(_):
                                 return_dict=False,
                             )[0]
                             
-                            if i not in train_timestep_indices:
-                                noise_pred = noise_pred.detach()
-                            
                             # perform guidance
                             if do_classifier_free_guidance:
                                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
@@ -447,6 +445,9 @@ def main(_):
                             if do_classifier_free_guidance and guidance_rescale > 0.0:
                                 # Based on 3.4. in https://arxiv.org/pdf/2305.08891.pdf
                                 noise_pred = rescale_noise_cfg(noise_pred, noise_pred_text, guidance_rescale=guidance_rescale)
+                            
+                            if i not in train_timestep_indices:
+                                noise_pred = noise_pred.detach()
                                 
                             # compute the previous noisy sample x_t -> x_t-1
                             step_output = pipeline.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=True)

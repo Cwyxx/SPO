@@ -37,7 +37,6 @@ def hpsv2_preference_model_func_builder(cfg):
             torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
     
-    @torch.no_grad()
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()
         img = _transform(img)
@@ -60,7 +59,6 @@ def imagereward_preference_model_func_builder(cfg):
             torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
     
-    @torch.no_grad()
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()
         image = _transform(image)

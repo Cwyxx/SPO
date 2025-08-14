@@ -17,7 +17,7 @@ def basic_config():
     config.use_xformers = False
     # enable activation checkpointing or not. 
     # this reduces memory usage at the cost of some additional compute.
-    config.use_checkpointing = False
+    config.use_checkpointing = True
     
     ###### Model Setting ######
     config.pretrained = pretrained = ml_collections.ConfigDict()
