@@ -61,7 +61,7 @@ def imagereward_preference_model_func_builder(cfg):
     
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()
-        image = _transform(image)
+        img = _transform(img)
         
         rm_input_ids, rm_attention_masks = [], []
         for prompt in extra_info['prompts']:
@@ -71,10 +71,10 @@ def imagereward_preference_model_func_builder(cfg):
             
         rm_input_ids = torch.stack(rm_input_ids)
         rm_attention_masks = torch.stack(rm_attention_masks)
-        rm_input_ids = rm_input_ids.view(-1, rm_input_ids.shape[-1])
-        rm_attention_mask = rm_attention_mask.view(-1, rm_attention_mask.shape[-1])
+        rm_input_ids = rm_input_ids.view(-1, rm_input_ids.shape[-1]).to(cfg.device)
+        rm_attention_masks = rm_attention_masks.view(-1, rm_attention_masks.shape[-1]).to(cfg.device)
         
-        scores = imagereward.score_grad(rm_input_ids, rm_attention_masks, img) # reward
+        scores = imagereward.score_gard(rm_input_ids, rm_attention_masks, img) # reward
         return scores
     
     return preference_fn

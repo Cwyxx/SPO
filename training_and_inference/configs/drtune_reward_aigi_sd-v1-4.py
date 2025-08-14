@@ -15,7 +15,7 @@ def exp_config():
     )
     
     ###### Preference Model ######
-    preference_model = "hpsv2"
+    preference_model = "imagereward"
     config.preference_model_func_cfg = dict(
         type=f"{preference_model}_preference_model_func"
     ) 
@@ -36,7 +36,7 @@ def exp_config():
     config.run_name = f"{config.wandb_project_name}-{preference_model}_{1-config.aigi_detector_weight}-{aigi_detector}_{config.aigi_detector_weight}" # experiment name under a project (wandb_project_name) in swanlab.
     
     ###### Training ######
-    config.resume_from = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/drtune_cfg-hpsv2_0.9-univfd_0.1/checkpoint_1"
+    config.resume_from = None
     config.num_epochs = 5
     config.pipeline_num_inference_steps = 50
     
