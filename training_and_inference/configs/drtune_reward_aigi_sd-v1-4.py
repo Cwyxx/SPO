@@ -15,7 +15,7 @@ def exp_config():
     )
     
     ###### Preference Model ######
-    preference_model = "imagereward"
+    preference_model = "hpsv2"
     config.preference_model_func_cfg = dict(
         type=f"{preference_model}_preference_model_func"
     ) 
