@@ -112,28 +112,22 @@ def pickscore_preference_model_func_builder(cfg):
 @PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="aigi_detector_preference_model_func")
 def aigi_detector_preference_model_func_builder(cfg):
     import safetensors
-    import albumentations as A
+    from diff_jpeg import diff_jpeg_coding
     if cfg.aigi_detector == "univfd":
         from aigi_detector_training.univfd import UnivFD
         aigi_detector = UnivFD("openai/clip-vit-large-patch14")
-        _transform = A.Compose([
-            # JPEG compress
-            A.ImageCompression(quality_range=(60, 100), p=1.0),
-            A.SmallestMaxSize(max_size=256, p=1.0),
-            A.CenterCrop(height=224, width=224, p=1.0),
-            A.Normalize(mean=(0.48145466, 0.4578275, 0.40821073), std=(0.26862954, 0.26130258, 0.27577711)),
-            A.ToTensorV2(),
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
     elif cfg.aigi_detector == "dinov2":
         from aigi_detector_training.dinov2 import Dinov2
         aigi_detector = Dinov2("facebook/dinov2-base")
-        _transform = A.Compose([
-            # JPEG compress
-            A.ImageCompression(quality_range=(60, 100), p=1.0),
-            A.SmallestMaxSize(max_size=256, p=1.0),
-            A.CenterCrop(height=224, width=224, p=1.0),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            A.ToTensorV2(),
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
     ckpt = safetensors.torch.load_file(cfg.aigi_detector_path)
@@ -141,11 +135,51 @@ def aigi_detector_preference_model_func_builder(cfg):
     aigi_detector.eval().to(cfg.device).requires_grad_(False)
     
     def preference_fn(img, extra_info):
-        img = (img / 2 + 0.5).clamp(0, 1).float() # [B, C, H, W]
-        images_np = (img * 255).round().to(torch.uint8).permute(0, 2, 3, 1).cpu().numpy() # [B, C, H, W] -> [B, H, W, C]
+        img = (img / 2 + 0.5).clamp(0, 1).float()*255.0 # [B, C, H, W], [0, 255]
+        jpeg_quality = torch.randint(low=60, high=100, size=(1,), device=cfg.device)
+        img_jpeg = diff_jpeg_coding(image_rgb=img, jpeg_quality=jpeg_quality) 
+        img_jpeg = img_jpeg / 255.0 # [0, 1]
+        img_transformed = _transform(img_jpeg)
+
+        logits = aigi_detector(img_transformed)
+        outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
+        scores = 1 - outputs
         
-        processed_images = [_transform(image=single_image_np)['image'] for single_image_np in images_np]
-        img_transformed = torch.stack(processed_images, dim=0).to(cfg.device)
+        return scores
+    
+    return preference_fn
+
+@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="aigi_detector_preference_model_albumentation_func")
+def aigi_detector_preference_model_func_builder(cfg):
+    import safetensors
+    from diff_jpeg import diff_jpeg_coding
+    if cfg.aigi_detector == "univfd":
+        from aigi_detector_training.univfd import UnivFD
+        aigi_detector = UnivFD("openai/clip-vit-large-patch14")
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
+    elif cfg.aigi_detector == "dinov2":
+        from aigi_detector_training.dinov2 import Dinov2
+        aigi_detector = Dinov2("facebook/dinov2-base")
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        
+    ckpt = safetensors.torch.load_file(cfg.aigi_detector_path)
+    aigi_detector.load_state_dict(ckpt)
+    aigi_detector.eval().to(cfg.device).requires_grad_(False)
+    
+    def preference_fn(img, extra_info):
+        img = (img / 2 + 0.5).clamp(0, 1).float()*255.0 # [B, C, H, W], [0, 255]
+        jpeg_quality = torch.randint(low=60, high=100, size=(1,), device=cfg.device)
+        img_jpeg = diff_jpeg_coding(image_rgb=img, jpeg_quality=jpeg_quality) 
+        img_jpeg = img_jpeg / 255.0 # [0, 1]
+        img_transformed = _transform(img_jpeg)
 
         logits = aigi_detector(img_transformed)
         outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake

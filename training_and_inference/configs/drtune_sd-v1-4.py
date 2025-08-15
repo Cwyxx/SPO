@@ -15,9 +15,15 @@ def exp_config():
     )
     
     ###### Preference Model ######
-    preference_model = "imagereward"
+    # preference_model = "imagereward"
+    # config.preference_model_func_cfg = dict(
+    #     type=f"{preference_model}_preference_model_func"
+    # ) 
+    preference_model = "univfd"
     config.preference_model_func_cfg = dict(
-        type=f"{preference_model}_preference_model_func"
+        type=f"aigi_detector_preference_model_func",
+        aigi_detector=f"{preference_model}",
+        aigi_detector_path="/data_center/data2/dataset/chenwy/21164-data/model-ckpt/univfd/genimage/best_model/model.safetensors"
     ) 
     
     ###### logging ######
