@@ -24,7 +24,7 @@ def exp_config():
     aigi_detector = "dinov2"
     config.aigi_detector_weight = 0.1
     config.aigi_detector_func_cfg = dict(
-        type=f"aigi_detector_preference_model_bceloss_func", # no_jpeg
+        type=f"aigi_detector_preference_model_bceloss_func",
         aigi_detector=f"{aigi_detector}",
         aigi_detector_path=f"/data_center/data2/dataset/chenwy/21164-data/model-ckpt/{aigi_detector}/genimage/best_model/model.safetensors"
     )

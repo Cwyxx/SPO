@@ -181,10 +181,8 @@ def aigi_detector_preference_model_func_builder(cfg):
     
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()# [B, C, H, W]
-        assert img.requires_grad == True
         
         img_transformed = _transform(img)
-        assert img_transformed.requires_grad == True
         
         logits = aigi_detector(img_transformed)
         outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
@@ -235,6 +233,20 @@ def aigi_detector_preference_model_func_builder(cfg):
     
     return preference_fn
 
-# @PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="spo_reward_aigi_detector_func")
-# def spo_reward_aigi_detector_func_builder(cfg):
+@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="spo_reward_aigi_detector_func")
+def spo_reward_aigi_detector_func_builder(cfg):
+    reward_model_func_cfg = cfg.pop("reward_model_func_cfg")    
+    aigi_detector_func_cfg = cfg.pop("aigi_detector_func_cfg")
     
+    reward_model_func = get_preference_model_func(reward_model_func_cfg, cfg.device)
+    aigi_detector_func = get_preference_model_func(aigi_detector_func_cfg, cfg.device)
+    
+    def preference_fn(img, extra_info):
+        reward_model_score = reward_model_func(img, extra_info)
+        aigi_detector_score = aigi_detector_func(img, extra_info)
+        
+        batch_size, _, _ , _ = img.shape
+        reward_model_score = reward_model_score.reshape(batch_size, 1)
+        aigi_detector_score = aigi_detector_score.reshape(batch_size, 1)
+        
+        return (reward_model_score, aigi_detector_score)

@@ -34,6 +34,7 @@ def multi_sample_pipeline(
     divert_start_step=0,
     num_samples_each_step=2,
     preference_model_fn=None,
+    bool_spo_reward_aigi_detector_func=False,
     compare_fn=None,
     extra_info=None,
     **kwargs,
@@ -113,7 +114,13 @@ def multi_sample_pipeline(
     valid_current_latents = []
     valid_next_latents = []
     valid_prompt_embeds = []
-    preference_score_logs = []
+    
+    if bool_spo_reward_aigi_detector_func == True:
+        reward_model_score_logs = []
+        aigi_detector_score_logs = []
+    else:
+        preference_score_logs = []
+    
     
     with self.progress_bar(total=timesteps.shape[0]) as progress_bar:
         for i, t in enumerate(timesteps):
@@ -175,8 +182,18 @@ def multi_sample_pipeline(
                     # num_sample_per_step*b
                     # preference scores of i-1
                     preference_scores = preference_model_fn(pred_x0, extra_info)
-                    preference_score_logs.append(preference_scores)
-                    preference_scores = preference_scores.reshape(num_samples_each_step, -1)
+                    if bool_spo_reward_aigi_detector_func == True:
+                        reward_model_scores, aigi_detector_scores = preference_scores
+                        reward_model_score_logs.append(reward_model_scores)
+                        aigi_detector_score_logs.append(aigi_detector_scores)
+                        
+                        reward_model_scores = reward_model_scores.reshape(num_samples_each_step, -1)
+                        aigi_detector_scores = aigi_detector_scores.reshape(num_samples_each_step, -1)
+                        preference_scores = (reward_model_scores, aigi_detector_scores)
+                    else: 
+                        preference_score_logs.append(preference_scores)
+                        preference_scores = preference_scores.reshape(num_samples_each_step, -1)
+                        
                     # indices: 2,b
                     # valid_samples: b
                     indices, valid_samples = compare_fn(preference_scores)
@@ -246,9 +263,20 @@ def multi_sample_pipeline(
                     extra_info['timesteps'] = preference_timestep
                     # num_sample_per_step*b
                     # preference scores of 0
+                    
                     preference_scores = preference_model_fn(prev_latents, extra_info)
-                    preference_score_logs.append(preference_scores)
-                    preference_scores = preference_scores.reshape(num_samples_each_step, -1)
+                    if bool_spo_reward_aigi_detector_func == True:
+                        reward_model_scores, aigi_detector_scores = preference_scores
+                        reward_model_score_logs.append(reward_model_scores)
+                        aigi_detector_score_logs.append(aigi_detector_scores)
+                        
+                        reward_model_scores = reward_model_scores.reshape(num_samples_each_step, -1)
+                        aigi_detector_scores = aigi_detector_scores.reshape(num_samples_each_step, -1)
+                        preference_scores = (reward_model_scores, aigi_detector_scores)
+                    else: 
+                        preference_score_logs.append(preference_scores)
+                        preference_scores = preference_scores.reshape(num_samples_each_step, -1)
+                        
                     # indices: 2,b
                     # valid_samples: b
                     indices, valid_samples = compare_fn(preference_scores)
@@ -298,6 +326,11 @@ def multi_sample_pipeline(
     # valid_num,1,l,c
     valid_prompt_embeds = torch.cat(valid_prompt_embeds, dim=0)
     
-    preference_score_logs = torch.cat(preference_score_logs, dim=0)
+    if bool_spo_reward_aigi_detector_func == True:
+        reward_model_score_logs = torch.cat(reward_model_score_logs, dim=0)
+        aigi_detector_score_logs = torch.cat(aigi_detector_score_logs, dim=0)
+        preference_score_logs = (reward_model_score_logs, aigi_detector_score_logs)
+    else:
+        preference_score_logs = torch.cat(preference_score_logs, dim=0)
     
     return valid_timesteps, valid_current_latents, valid_next_latents, valid_prompt_embeds, preference_score_logs

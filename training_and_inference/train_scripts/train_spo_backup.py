@@ -3,11 +3,11 @@ import os
 import os.path as osp
 import sys
 # Add the project directory to the Python path to simplify imports without manually setting PYTHONPATH.
-current_dir = osp.dirname(osp.abspath(__file__)) # train_scripts
-parent_dir = osp.abspath(osp.join(current_dir, "..")) # training_and_inference
-sys.path.insert(0, parent_dir)
-grandparent_dir = osp.abspath(osp.join(current_dir, "..", "..")) # SPO
-sys.path.insert(0, grandparent_dir)
+sys.path.insert(
+    0, osp.abspath(
+        osp.join(osp.dirname(osp.abspath(__file__)), "..")
+    ),
+)
 import copy
 import contextlib
 import math
@@ -378,31 +378,16 @@ def main(_):
                     compare_fn=compare_func,
                     extra_info=extra_info,
                 )
-            
-            if bool_spo_reward_aigi_detector_func == True:
-                reward_model_score_logs, aigi_detector_score_logs = preference_score_logs
-                reward_model_score_logs = accelerator.gather(reward_model_score_logs).detach()
-                aigi_detector_score_logs = accelerator.gather(aigi_detector_score_logs).detach()
-                accelerator.log(
-                    {
-                        "reward_model_scores_mean": reward_model_score_logs.mean().item(),
-                        "reward_model_scores_std": reward_model_score_logs.std().item(),
-                        "aigi_detector_scores_mean": aigi_detector_score_logs.mean().item(),
-                        "aigi_detector_score_std": aigi_detector_score_logs.std().item(),
-                    },
-                    step=global_step,
-                )
-                del reward_model_score_logs, aigi_detector_score_logs
-            else:
-                preference_score_logs = accelerator.gather(preference_score_logs).detach()
-                accelerator.log(
-                    {
-                        "preference_scores_mean": preference_score_logs.mean().item(), 
-                        "preference_scores_std": preference_score_logs.std().item(),
-                    },
-                    step=global_step,
-                )
-                del preference_score_logs
+                
+            preference_score_logs = accelerator.gather(preference_score_logs).detach()
+            accelerator.log(
+                {
+                    "preference_scores_mean": preference_score_logs.mean().item(), 
+                    "preference_scores_std": preference_score_logs.std().item(),
+                },
+                step=global_step,
+            )
+            del preference_score_logs
             
             if accelerator.num_processes > 1:
                 accelerator.wait_for_everyone()
