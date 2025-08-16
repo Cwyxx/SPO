@@ -255,7 +255,7 @@ def main(_):
     data_loader = torch.utils.data.DataLoader(
         prompt_dataset,
         collate_fn=collate_fn,
-        batch_size=config.train.train_bacth_size,
+        batch_size=config.train.train_batch_size,
         num_workers=config.dataloader_num_workers,
         shuffle=config.dataloader_shuffle,
         pin_memory=config.dataloader_pin_memory,

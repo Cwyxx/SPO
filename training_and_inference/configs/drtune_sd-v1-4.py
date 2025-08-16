@@ -21,7 +21,7 @@ def exp_config():
     # ) 
     preference_model = "dinov2"
     config.preference_model_func_cfg = dict(
-        type=f"aigi_detector_preference_model_func",
+        type=f"aigi_detector_preference_model_jpeg_func",
         aigi_detector=f"{preference_model}",
         aigi_detector_path=f"/data_center/data2/dataset/chenwy/21164-data/model-ckpt/{preference_model}/genimage/best_model/model.safetensors"
     ) 

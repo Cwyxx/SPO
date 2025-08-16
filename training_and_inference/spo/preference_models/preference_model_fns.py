@@ -1,7 +1,7 @@
 import torch
 import torchvision
 
-from .builder import PREFERENCE_MODEL_FUNC_BUILDERS
+from .builder import PREFERENCE_MODEL_FUNC_BUILDERS, get_preference_model_func
 
 @PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name='step_aware_preference_model_func')
 def step_aware_preference_model_func_builder(cfg):
@@ -109,8 +109,8 @@ def pickscore_preference_model_func_builder(cfg):
     
     return preference_fn
 
-@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="aigi_detector_preference_model_func")
-def aigi_detector_preference_model_func_builder(cfg):
+@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="aigi_detector_preference_model_jpeg_func")
+def aigi_detector_preference_model_jpeg_func_builder(cfg):
     import safetensors
     from diff_jpeg import diff_jpeg_coding
     if cfg.aigi_detector == "univfd":
@@ -155,10 +155,9 @@ def aigi_detector_preference_model_func_builder(cfg):
     
     return preference_fn
 
-@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="aigi_detector_preference_model_albumentation_func")
+@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="aigi_detector_preference_model_func")
 def aigi_detector_preference_model_func_builder(cfg):
     import safetensors
-    from diff_jpeg import diff_jpeg_coding
     if cfg.aigi_detector == "univfd":
         from aigi_detector_training.univfd import UnivFD
         aigi_detector = UnivFD("openai/clip-vit-large-patch14")
@@ -181,15 +180,10 @@ def aigi_detector_preference_model_func_builder(cfg):
     aigi_detector.eval().to(cfg.device).requires_grad_(False)
     
     def preference_fn(img, extra_info):
-        img = (img / 2 + 0.5).clamp(0, 1).float()*255.0 # [B, C, H, W], [0, 255]
+        img = (img / 2 + 0.5).clamp(0, 1).float()# [B, C, H, W]
         assert img.requires_grad == True
         
-        jpeg_quality = torch.randint(low=60, high=100, size=(1,), device=cfg.device)
-        img_jpeg = diff_jpeg_coding(image_rgb=img, jpeg_quality=jpeg_quality) 
-        assert img_jpeg.requires_grad == True
-        
-        img_jpeg = img_jpeg / 255.0 # [0, 1]
-        img_transformed = _transform(img_jpeg)
+        img_transformed = _transform(img)
         assert img_transformed.requires_grad == True
         
         logits = aigi_detector(img_transformed)
@@ -199,3 +193,48 @@ def aigi_detector_preference_model_func_builder(cfg):
         return scores
     
     return preference_fn
+
+@PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="aigi_detector_preference_model_bceloss_func")
+def aigi_detector_preference_model_func_builder(cfg):
+    import safetensors
+    if cfg.aigi_detector == "univfd":
+        from aigi_detector_training.univfd import UnivFD
+        aigi_detector = UnivFD("openai/clip-vit-large-patch14")
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
+    elif cfg.aigi_detector == "dinov2":
+        from aigi_detector_training.dinov2 import Dinov2
+        aigi_detector = Dinov2("facebook/dinov2-base")
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        
+    ckpt = safetensors.torch.load_file(cfg.aigi_detector_path)
+    aigi_detector.load_state_dict(ckpt)
+    aigi_detector.eval().to(cfg.device).requires_grad_(False)
+    bceloss = torch.nn.BCEWithLogitsLoss(reduction="none")
+
+    def preference_fn(img, extra_info):
+        img = (img / 2 + 0.5).clamp(0, 1).float()# [B, C, H, W]
+        assert img.requires_grad == True
+        
+        img_transformed = _transform(img)
+        assert img_transformed.requires_grad == True
+        
+        logits = aigi_detector(img_transformed)
+        zero_label = torch.zeros_like(logits) # zero means real.
+        loss = bceloss(logits, zero_label) # lower is better.
+        scores = -1 * loss
+        
+        return scores
+    
+    return preference_fn
+
+# @PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name="spo_reward_aigi_detector_func")
+# def spo_reward_aigi_detector_func_builder(cfg):
+    

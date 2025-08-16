@@ -21,23 +21,25 @@ def exp_config():
     ) 
     
     ###### Aigi Detector ######
-    aigi_detector = "univfd"
+    aigi_detector = "dinov2"
     config.aigi_detector_weight = 0.1
     config.aigi_detector_func_cfg = dict(
-        type=f"aigi_detector_preference_model_func",
+        type=f"aigi_detector_preference_model_bceloss_func", # no_jpeg
         aigi_detector=f"{aigi_detector}",
-        aigi_detector_path="/data_center/data2/dataset/chenwy/21164-data/model-ckpt/univfd/genimage/best_model/model.safetensors"
+        aigi_detector_path=f"/data_center/data2/dataset/chenwy/21164-data/model-ckpt/{aigi_detector}/genimage/best_model/model.safetensors"
     )
     
     ###### logging ######
-    # total_batch_size: 1 * 4 * 4
+    # total_batch_size: 2 * 2 * 4
     config.wandb_project_name = "drtune_cfg"
     config.logdir = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k"
-    config.run_name = f"{config.wandb_project_name}-{preference_model}_{1-config.aigi_detector_weight}-{aigi_detector}_{config.aigi_detector_weight}" # experiment name under a project (wandb_project_name) in swanlab.
+    config.run_name = f"{config.wandb_project_name}-{preference_model}_{1-config.aigi_detector_weight}-{aigi_detector}_{config.aigi_detector_weight}_bceloss" # experiment name under a project (wandb_project_name) in swanlab.
     
     ###### Training ######
+    config.train.train_batch_size = 1
+    config.train.gradient_accumulation_steps = 4
     config.resume_from = None
-    config.num_epochs = 5
+    config.num_epochs = 4
     config.pipeline_num_inference_steps = 50
     
     ###### drtune ######
