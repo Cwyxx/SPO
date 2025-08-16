@@ -136,11 +136,17 @@ def aigi_detector_preference_model_func_builder(cfg):
     
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()*255.0 # [B, C, H, W], [0, 255]
-        jpeg_quality = torch.randint(low=60, high=100, size=(1,), device=cfg.device)
+        batch_size, _, _, _ = img.shape
+        assert img.requires_grad == True
+        
+        jpeg_quality = torch.randint(low=60, high=100, size=(batch_size,), device=cfg.device)
         img_jpeg = diff_jpeg_coding(image_rgb=img, jpeg_quality=jpeg_quality) 
         img_jpeg = img_jpeg / 255.0 # [0, 1]
+        assert img_jpeg.requires_grad == True
+        
         img_transformed = _transform(img_jpeg)
-
+        assert img_transformed.requires_grad == True
+        
         logits = aigi_detector(img_transformed)
         outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
         scores = 1 - outputs
@@ -176,11 +182,16 @@ def aigi_detector_preference_model_func_builder(cfg):
     
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()*255.0 # [B, C, H, W], [0, 255]
+        assert img.requires_grad == True
+        
         jpeg_quality = torch.randint(low=60, high=100, size=(1,), device=cfg.device)
         img_jpeg = diff_jpeg_coding(image_rgb=img, jpeg_quality=jpeg_quality) 
+        assert img_jpeg.requires_grad == True
+        
         img_jpeg = img_jpeg / 255.0 # [0, 1]
         img_transformed = _transform(img_jpeg)
-
+        assert img_transformed.requires_grad == True
+        
         logits = aigi_detector(img_transformed)
         outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
         scores = 1 - outputs

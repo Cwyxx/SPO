@@ -255,7 +255,7 @@ def main(_):
     data_loader = torch.utils.data.DataLoader(
         prompt_dataset,
         collate_fn=collate_fn,
-        batch_size=config.sample.sample_batch_size,
+        batch_size=config.train.train_bacth_size,
         num_workers=config.dataloader_num_workers,
         shuffle=config.dataloader_shuffle,
         pin_memory=config.dataloader_pin_memory,
@@ -454,10 +454,12 @@ def main(_):
                 pred_x0 = pipeline.vae.decode(pred_original_sample.to(pipeline.vae.dtype)).sample
                 
                 scores = preference_model_fn(pred_x0, batch['extra_info']).mean()
+                assert scores.requires_grad == True
                 backward_loss = -1 * scores
                 
                 if hasattr(config, "aigi_detector_func_cfg"):
                     aigi_detector_scores = aigi_detector_fn(pred_x0, batch['extra_info']).mean()
+                    assert aigi_detector_scores.requires_grad == True
                     backward_loss = (1 - config.aigi_detector_weight) * (-1 * scores) +  config.aigi_detector_weight * (-1 * aigi_detector_scores)
 
                 avg_scores = accelerator.reduce(scores.detach(), reduction="mean")

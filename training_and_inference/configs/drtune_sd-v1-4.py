@@ -19,20 +19,22 @@ def exp_config():
     # config.preference_model_func_cfg = dict(
     #     type=f"{preference_model}_preference_model_func"
     # ) 
-    preference_model = "univfd"
+    preference_model = "dinov2"
     config.preference_model_func_cfg = dict(
         type=f"aigi_detector_preference_model_func",
         aigi_detector=f"{preference_model}",
-        aigi_detector_path="/data_center/data2/dataset/chenwy/21164-data/model-ckpt/univfd/genimage/best_model/model.safetensors"
+        aigi_detector_path=f"/data_center/data2/dataset/chenwy/21164-data/model-ckpt/{preference_model}/genimage/best_model/model.safetensors"
     ) 
     
     ###### logging ######
-    # total_batch_size: 1 * 4 * 4
+    # total_batch_size: 2 * 2 * 4
     config.wandb_project_name = "drtune_cfg"
     config.logdir = f"/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k"
     config.run_name = f"{config.wandb_project_name}-{preference_model}" # experiment name under a project (wandb_project_name) in swanlab.
     
     ###### Training ######
+    config.train.train_batch_size = 2
+    config.train.gradient_accumulation_steps = 2
     config.resume_from = None
     config.num_epochs = 5
     config.pipeline_num_inference_steps = 50
