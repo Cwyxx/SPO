@@ -19,6 +19,7 @@ def exp_config():
     # config.preference_model_func_cfg = dict(
     #     type=f"{preference_model}_preference_model_func"
     # ) 
+    config.train.early_stop_threshold = 0.4
     preference_model = "dinov2"
     config.preference_model_func_cfg = dict(
         type=f"aigi_detector_preference_model_jpeg_func",

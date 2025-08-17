@@ -74,6 +74,8 @@ def basic_config():
     sample.num_sample_each_step = 4 # origin 2
 
     config.train = train = ml_collections.ConfigDict()
+    # early stop 
+    train.early_stop_threshold = None
     # batch size (per GPU!) to use for training.
     train.train_batch_size = 1 # origin 10
     # whether to use the 8bit Adam optimizer from bitsandbytes.

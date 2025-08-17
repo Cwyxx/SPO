@@ -307,6 +307,7 @@ def main(_):
         first_epoch = 0
         global_step = 0
     
+    TERMINATE = False
     for epoch in tqdm(
         range(first_epoch, config.num_epochs),
         total=config.num_epochs,
@@ -478,7 +479,7 @@ def main(_):
                     accelerator.clip_grad_norm_(trainable_para, config.train.max_grad_norm)
                 optimizer.step()
                 optimizer.zero_grad()
-                
+            
             if accelerator.sync_gradients:
                 # log training-related stuff
                 info = {
@@ -489,15 +490,26 @@ def main(_):
                     "lr": optimizer.param_groups[0]['lr'],
                 }
                 
+                # preference_model + aigi_detector
                 if hasattr(config, "aigi_detector_func_cfg"):
                     info["train_aigi_detector_socres"] = train_aigi_detector_scores
+                    # apply aigi_detector_scores to scores (used to determine TERMINATE)
+                    train_scores = train_aigi_detector_scores
                     train_aigi_detector_scores = 0.0
+                        
+                # apply early stop.
+                # only_preference_model: train_scores
+                # preference_model + aigi_detector: train_aigi_detector
+                if config.train.early_stop_threshold is not None and train_scores > config.train.early_stop_threshold:
+                    TERMINATE = True
                     
                 accelerator.log(info, step=global_step)
                 global_step += 1
                 train_scores, train_backward_loss = 0.0, 0.0
 
-            
+            if TERMINATE:
+                break
+        
         ########## save ckpt and evaluation ##########
         if accelerator.is_main_process:
             if (epoch + 1) % config.save_interval == 0:
@@ -548,7 +560,11 @@ def main(_):
                 
                 pipeline.unet.train()
                 torch.cuda.empty_cache()
-    
+
+        ##########  TERMINATE ########## 
+        if TERMINATE:
+            break
+        
     # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:

@@ -21,6 +21,7 @@ def exp_config():
     ) 
     
     ###### Aigi Detector ######
+    config.train.early_stop_threshold = 0.4
     aigi_detector = "dinov2"
     config.aigi_detector_weight = 0.1
     config.aigi_detector_func_cfg = dict(
