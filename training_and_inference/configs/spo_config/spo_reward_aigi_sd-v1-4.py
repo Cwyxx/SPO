@@ -14,18 +14,19 @@ def exp_config():
     )
     
     ###### Preference Model ######
-    preference_model = "hpsv2"
-    aigi_detector = "dinov2"
-    aigi_detector_weight = 0.5
+    config.bool_spo_reward_aigi_detector_func = True
+    config.preference_model = "hpsv2"
+    config.aigi_detector = "dinov2"
+    config.aigi_detector_weight = 0.5
     config.preference_model_func_cfg = dict(
         type="spo_reward_aigi_detector_func",
         reward_model_func_cfg=dict(
-            type=f"{preference_model}_preference_model_func",
+            type=f"{config.preference_model}_preference_model_func",
         ),
         aigi_detector_func_cfg=dict(
-            type=f"aigi_detector_preference_model_bceloss_func", 
-            aigi_detector=f"{aigi_detector}",
-            aigi_detector_path=f"/data_center/data2/dataset/chenwy/21164-data/model-ckpt/{aigi_detector}/genimage/best_model/model.safetensors"
+            type=f"aigi_detector_preference_model_func", 
+            aigi_detector=f"{config.aigi_detector}",
+            aigi_detector_path=f"/data_center/data2/dataset/chenwy/21164-data/model-ckpt/{config.aigi_detector}/genimage/best_model/model.safetensors"
         )
     )
     
@@ -38,6 +39,7 @@ def exp_config():
     
     
     ###### Training ######
+    config.train.early_stop_threshold = 0.4
     config.sample.num_sample_each_step = 4
     # total_train_batch_size = 4 * 1 * 4 = 16
     config.train.train_batch_size = 4
@@ -47,7 +49,9 @@ def exp_config():
     
     #### logging ####
     config.wandb_project_name = "spo"
-    config.logdir = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/SPO"
-    config.run_name = f"{config.wandb_project_name}-{preference_model}_{1-config.aigi_detector_weight}-{aigi_detector}_{config.aigi_detector_weight}"
-
+    config.logdir = f"/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/{config.wandb_project_name}"
+    config.run_name = f"{config.wandb_project_name}-{config.preference_model}_{1-config.aigi_detector_weight}-{config.aigi_detector}_{config.aigi_detector_weight}"
+    config.validation_prompts = [ 'a cat.', 'a dog', 'a horse.', 'A bus stopped on the side of the road while people board it.', 'A woman holding a plate of cake in her hand.']
+    config.num_validation_images = 1
+    
     return config

@@ -288,7 +288,10 @@ def main(_):
     total_train_batch_size = (
         config.train.train_batch_size * accelerator.num_processes * config.train.gradient_accumulation_steps
     )
-    bool_spo_reward_aigi_detector_func = config.preference_model_func_cfg == "spo_reward_aigi_detector_func"
+    bool_spo_reward_aigi_detector_func = False
+    if hasattr(config, "bool_spo_reward_aigi_detector_func") and config.bool_spo_reward_aigi_detector_func:
+        bool_spo_reward_aigi_detector_func = True
+        
     logger.info("***** Running training *****")
     logger.info(f"  Num Epochs = {config.num_epochs}")
     logger.info(f"  Sampling batch size per device = {config.sample.sample_batch_size}")
@@ -308,6 +311,7 @@ def main(_):
         first_epoch = 0
         global_step = 0
     
+    TERMINATE = False
     for epoch in tqdm(
         range(first_epoch, config.num_epochs),
         total=config.num_epochs,
@@ -392,6 +396,9 @@ def main(_):
                     },
                     step=global_step,
                 )
+                # apply early stop.
+                if config.train.early_stop_threshold is not None and aigi_detector_score_logs.mean().item() > config.train.early_stop_threshold:
+                    TERMINATE = True
                 del reward_model_score_logs, aigi_detector_score_logs
             else:
                 preference_score_logs = accelerator.gather(preference_score_logs).detach()
@@ -402,7 +409,13 @@ def main(_):
                     },
                     step=global_step,
                 )
+                # apply early stop.
+                if config.train.early_stop_threshold is not None and preference_score_logs.mean().item() > config.train.early_stop_threshold:
+                    TERMINATE = True
                 del preference_score_logs
+            
+            if TERMINATE:
+                break
             
             if accelerator.num_processes > 1:
                 accelerator.wait_for_everyone()
@@ -700,7 +713,11 @@ def main(_):
                 unet.train()
                 pipeline.unet.train()
                 torch.cuda.empty_cache()
-    
+
+        ##########  TERMINATE ########## 
+        if TERMINATE:
+            break
+        
     # Save the lora layers
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
