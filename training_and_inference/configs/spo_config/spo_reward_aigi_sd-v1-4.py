@@ -31,9 +31,10 @@ def exp_config():
     )
     
     ###### Compare Function ######
+    compare_func_threshold = 0.3
     config.compare_func_cfg = dict(
         type="spo_reward_aigi_detector_compare",
-        threshold=0.0,
+        threshold=compare_func_threshold,
         aigi_detector_weight=config.aigi_detector_weight
     )
     
@@ -50,7 +51,7 @@ def exp_config():
     #### logging ####
     config.wandb_project_name = "spo"
     config.logdir = f"/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/{config.wandb_project_name}"
-    config.run_name = f"{config.wandb_project_name}-{config.preference_model}_{1-config.aigi_detector_weight}-{config.aigi_detector}_{config.aigi_detector_weight}"
+    config.run_name = f"{config.wandb_project_name}-{config.preference_model}_{1-config.aigi_detector_weight}-{config.aigi_detector}_{config.aigi_detector_weight}-comp_func_threshold_{compare_func_threshold}"
     config.validation_prompts = [ 'a cat.', 'a dog', 'a horse.', 'A bus stopped on the side of the road while people board it.', 'A woman holding a plate of cake in her hand.']
     config.num_validation_images = 1
     
