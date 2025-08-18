@@ -354,8 +354,8 @@ def main(_):
                     return_dict=True
                 ).images for _ in range(0, config.sample.num_sample_each_step) 
             ]
-            sample_images = torch.stack(sample_images_list, dim=0) # pixel_value_range: [0,1], shape: [num_images_per_prompt, prompt_num, C, H, W], e.g. [4, 1, 3, 512, 512]
-            sample_images = sample_images.reshape(-1, *sample_images.shape[2:]) # [ num_images_per_prompt * prompt_num, C, H, W], e.g. [4, 3, 512, 512]
+            sample_images = torch.stack(sample_images_list, dim=0) # pixel_value_range: [0,1], shape: [num_images_per_prompt, prompt_num, C, H, W], e.g. [4, 2, 3, 512, 512]
+            sample_images = sample_images.reshape(-1, *sample_images.shape[2:]) # [ num_images_per_prompt * prompt_num, C, H, W], e.g. [8, 3, 512, 512]
             
             # prepare extra_info for the preference model
             extra_info = batch['extra_info']
@@ -376,11 +376,11 @@ def main(_):
                 accelerator.print(f"aigi_detector_scores: {aigi_detector_scores.shape}")
                 preference_scores = (1 - config.aigi_detector_weight) * reward_model_scores + config.aigi_detector_weight * aigi_detector_scores
                 
-            accelerator.print(f"preference_scores.shape: {preference_scores.shape}") # [num_images_per_prompt, prompt_num]
+            preference_scores = preference_scores.reshape(config.sample.num_sample_each_step, -1) # [ num_images_per_prompt, prompt_num ]
+            print(f"preference_scores: {preference_scores}")
             
             preference_scores, indices = torch.sort(preference_scores, dim=0, descending=True)
-            sample_images = sample_images.reshape(config.sample.num_sample_each_step, -1, *sample_images[1:]) # [num_images_per_prompt * prompt_num, C, H, W] -> [num_images_per_prompt, prompt_num, C, H, W]
-            accelerator.print(f"sample_images.reshape.shape: {sample_images.shape}")
+            sample_images = sample_images.reshape(config.sample.num_sample_each_step, -1, *sample_images.shape[1:]) # [num_images_per_prompt * prompt_num, C, H, W] -> [num_images_per_prompt, prompt_num, C, H, W], e.g. [4, 2, 3, 512, 512]
             
             indices = indices[[0, -1], :][..., None, None, None].expand(-1, -1, *sample_images.shape[2:]) # [2,b] -> [2, b, 1, 1, 1] -> [2, b, c, h, w]
             pick_images = torch.take_along_dim(sample_images, indices, dim=0) 
