@@ -397,7 +397,9 @@ def main(_):
                     step=global_step,
                 )
                 # apply early stop.
-                if config.train.early_stop_threshold is not None and aigi_detector_score_logs.mean().item() > config.train.early_stop_threshold:
+                if epoch > 0 and config.train.early_stop_threshold is not None and aigi_detector_score_logs.mean().item() > config.train.early_stop_threshold:
+                    accelerator.print(f"aigi_detector_score_logs.mean().item(): {aigi_detector_score_logs.mean().item()}")
+                    accelerator.print(f"config.train.early_stop_threshold: {config.train.early_stop_threshold:}")
                     TERMINATE = True
                 del reward_model_score_logs, aigi_detector_score_logs
             else:
@@ -410,7 +412,9 @@ def main(_):
                     step=global_step,
                 )
                 # apply early stop.
-                if config.train.early_stop_threshold is not None and preference_score_logs.mean().item() > config.train.early_stop_threshold:
+                if epoch > 0 and config.train.early_stop_threshold is not None and preference_score_logs.mean().item() > config.train.early_stop_threshold:
+                    accelerator.print(f"preference_score_logs.mean().item(): {preference_score_logs.mean().item()}")
+                    accelerator.print(f"config.train.early_stop_threshold: {config.train.early_stop_threshold:}")
                     TERMINATE = True
                 del preference_score_logs
             

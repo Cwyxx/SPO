@@ -54,6 +54,7 @@ config_flags.DEFINE_config_file(
 
 logger = get_logger(__name__)
 
+# DEBUG command: HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=2 python train_scripts/train_Diffusion_dpo.py --config=configs/diffusion_dpo_config/diffusion_dpo-sd-v1-4.py 
 
 def main(_):
     config = FLAGS.config
@@ -342,20 +343,20 @@ def main(_):
             #################### SAMPLING ####################
             ref.eval()
             pipeline.unet = ref # change pipeline.unet to ref. 
-            sample_latents_list = [ # [ 1, prompt_num, C, H, W ]
+            sample_images_list = [ # [ 1, prompt_num, C, H, W ]
                 pipeline(
                     prompt=batch['prompts'],
                     num_inference_steps=config.sample.num_steps,
                     guidance_scale=config.sample.guidance_scale,
                     eta=config.sample.eta,
                     num_images_per_prompt=1,
-                    output_type="latent",
-                ).image.unsqueeze(0) for _ in range(0, config.sample.num_sample_each_step) ]
-            sample_latents = torch.cat(sample_latents_list, dim=0) # [num_images_per_prompt, prompt_num, C, H, W]
-            accelerator.print(f"pipeline_output.sample_latents.shape: {sample_latents.shape}")
+                    output_type="pt",
+                    return_dict=True
+                ).images for _ in range(0, config.sample.num_sample_each_step) 
+            ]
+            sample_images = torch.stack(sample_images_list, dim=0) # pixel_value_range: [0,1], shape: [num_images_per_prompt, prompt_num, C, H, W], e.g. [4, 1, 3, 512, 512]
+            sample_images = sample_images.reshape(-1, *sample_images.shape[2:]) # [ num_images_per_prompt * prompt_num, C, H, W], e.g. [4, 3, 512, 512]
             
-            sample_latents = sample_latents.reshape(-1, *sample_latents.shape[2:]) # [ num_images_per_prompt * prompt_num, C, H, W]
-            accelerator.print(f"reshape.sample_latents.shape: {sample_latents.shape}")
             # prepare extra_info for the preference model
             extra_info = batch['extra_info']
             for k, v in extra_info.items():
@@ -367,40 +368,35 @@ def main(_):
                 else:
                     raise ValueError(f"Unknown type {type(v)} for extra_info[{k}]")
             
-            preference_scores = preference_model_fn(sample_latents, extra_info)
+            preference_scores = preference_model_fn(sample_images, extra_info)
             if bool_spo_reward_aigi_detector_func == True:
                 reward_model_scores, aigi_detector_scores = preference_scores
-                def normalize_scores(scores, eps=1e-6):
-                    """
-                    Z-score normalize
-                    """
-                    mean = torch.mean(scores, dim=0, keepdim=True)
-                    std = torch.std(scores, dim=0, keepdim=True)
-                    return (scores - mean) / (std + eps)
-                
-                # reward_model_scores / aigi_detector_scores: num_sample_per_step, b
-                norm_reward = normalize_scores(reward_model_scores)
-                norm_aigi = normalize_scores(aigi_detector_scores)
                 
                 accelerator.print(f"reward_model_scores: {reward_model_scores.shape}")
                 accelerator.print(f"aigi_detector_scores: {aigi_detector_scores.shape}")
-                preference_scores = (1 - config.aigi_detector_weight) * norm_reward + config.aigi_detector_weight * norm_aigi
+                preference_scores = (1 - config.aigi_detector_weight) * reward_model_scores + config.aigi_detector_weight * aigi_detector_scores
+                
             accelerator.print(f"preference_scores.shape: {preference_scores.shape}") # [num_images_per_prompt, prompt_num]
             
             preference_scores, indices = torch.sort(preference_scores, dim=0, descending=True)
-            sample_latents = sample_latents.reshape(config.sample.num_sample_each_step, -1, *sample_latents[1:]) # [num_images_per_prompt * prompt_num, C, H, W] -> [num_images_per_prompt, prompt_num, C, H, W]
-            indices = indices[[0, -1], :][..., None, None, None].expand(-1, -1, *sample_latents.shape[2:]) # [2,b] -> [2, b, 1, 1, 1] -> [2, b, c, h, w]
-            pick_latents = torch.take_along_dim(sample_latents, indices, dim=0) 
-            win_latents = pick_latents[0]
-            lose_latents = pick_latents[1]
+            sample_images = sample_images.reshape(config.sample.num_sample_each_step, -1, *sample_images[1:]) # [num_images_per_prompt * prompt_num, C, H, W] -> [num_images_per_prompt, prompt_num, C, H, W]
+            accelerator.print(f"sample_images.reshape.shape: {sample_images.shape}")
             
+            indices = indices[[0, -1], :][..., None, None, None].expand(-1, -1, *sample_images.shape[2:]) # [2,b] -> [2, b, 1, 1, 1] -> [2, b, c, h, w]
+            pick_images = torch.take_along_dim(sample_images, indices, dim=0) 
+            accelerator.print(f"pick_images.shape: {pick_images.shape}")
+            
+            win_images = pick_images[0]
+            lose_images = pick_images[1]
+            
+            pipeline.unet = unet # change pipeline.unet (ref) to unet (train)
+            TERMINATE = True
+            break
             batch_size = batch['input_ids'].shape[0]
             prompt_ids = batch['input_ids']
             # encode prompts
             prompt_embeds = pipeline.text_encoder(prompt_ids)[0]
             sample_neg_prompt_embeds = neg_prompt_embed.repeat(batch_size, 1, 1)
-            
-            
             
             if bool_spo_reward_aigi_detector_func == True:
                 reward_model_score_logs, aigi_detector_score_logs = preference_score_logs

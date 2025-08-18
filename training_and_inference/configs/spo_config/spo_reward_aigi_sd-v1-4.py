@@ -17,7 +17,7 @@ def exp_config():
     config.bool_spo_reward_aigi_detector_func = True
     config.preference_model = "hpsv2"
     config.aigi_detector = "dinov2"
-    config.aigi_detector_weight = 0.5
+    config.aigi_detector_weight = 0.1
     config.preference_model_func_cfg = dict(
         type="spo_reward_aigi_detector_func",
         reward_model_func_cfg=dict(
@@ -31,7 +31,7 @@ def exp_config():
     )
     
     ###### Compare Function ######
-    compare_func_threshold = 0.3
+    compare_func_threshold = 1e-2
     config.compare_func_cfg = dict(
         type="spo_reward_aigi_detector_compare",
         threshold=compare_func_threshold,
@@ -40,12 +40,12 @@ def exp_config():
     
     
     ###### Training ######
-    config.train.early_stop_threshold = 0.4
+    config.train.early_stop_threshold = 0.3
     config.sample.num_sample_each_step = 4
     # total_train_batch_size = 4 * 1 * 4 = 16
     config.train.train_batch_size = 4
     config.train.gradient_accumulation_steps = 1
-    config.resume_from = None
+    config.resume_from = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/spo/spo-hpsv2_0.9-dinov2_0.1-comp_func_threshold_0.01/checkpoint_0"
     config.num_epochs = 4
     
     #### logging ####
