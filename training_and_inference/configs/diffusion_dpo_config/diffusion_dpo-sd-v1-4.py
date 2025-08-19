@@ -33,7 +33,7 @@ def exp_config():
     config.train.early_stop_threshold = None
     config.train.early_stop_warmup_step = 300
     config.train.max_train_steps = 1000
-    config.num_epochs = 1
+    config.num_epochs = 10
     
     #### logging ####
     # total_train_batch_size = 4 * 1 * 4 = 16

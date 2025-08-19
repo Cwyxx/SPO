@@ -322,7 +322,7 @@ def main(_):
                 #################### SAMPLING ####################
                 with torch.no_grad():
                     ref.eval()
-                    pipeline.unet = ref # change pipeline.unet to ref. 
+                    pipeline.unet = ref
                     sample_images_list = [ # [ 1, prompt_num, C, H, W ]
                         pipeline(
                             prompt=batch['prompts'],
@@ -334,7 +334,7 @@ def main(_):
                             return_dict=True
                         ).images for _ in range(0, config.diffusion_dpo.num_images_per_prompt) 
                     ]
-                    sample_images = torch.stack(sample_images_list, dim=0) # pixel_value_range: [0,1], shape: [num_images_per_prompt, prompt_num, C, H, W], e.g. [4, 2, 3, 512, 512]
+                    sample_images = torch.stack(sample_images_list, dim=0).to(accelerator.device) # pixel_value_range: [0,1], shape: [num_images_per_prompt, prompt_num, C, H, W], e.g. [4, 2, 3, 512, 512]
                     sample_images = sample_images.reshape(-1, *sample_images.shape[2:]) # [ num_images_per_prompt * prompt_num, C, H, W], e.g. [8, 3, 512, 512]
                     
                     # prepare extra_info for the preference model
@@ -377,10 +377,10 @@ def main(_):
                     pick_images = pick_images.reshape(-1, *pick_images.shape[2:]) # [ 2 * prompt_num, C, H, W ]   
                     # win_images = pick_images[0] # [prompt_num, C, H, W]
                     # lose_images = pick_images[1]
+                    
                 #################### SAMPLING ####################
-
+                pipeline.unet = accelerator.unwrap_model(unet)
                 #### Diffusion Stuff ####
-                pipeline.unet = unet # change pipeline.unet (ref) to unet (train)
                 # encode pixels --> latents
                 with torch.no_grad():
                     latents = pipeline.vae.encode(pick_images.to(pipeline.vae.dtype)).latent_dist.sample()
@@ -502,7 +502,7 @@ def main(_):
                                         prompt=validation_prompt,
                                         num_inference_steps=config.diffusion_dpo.num_inference_steps,
                                         generator=generator,
-                                        guidance_scale=config.sample.guidance_scale,
+                                        guidance_scale=config.diffusion_dpo.guidance_scale,
                                     ).images[0]
                                     for _ in range(config.num_validation_images)
                                 ]

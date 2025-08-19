@@ -40,7 +40,7 @@ def exp_config():
     
     
     ###### Training ######
-    config.train.early_stop_threshold = 0.3
+    config.train.early_stop_threshold = 0.4
     config.sample.num_sample_each_step = 4
     # total_train_batch_size = 4 * 1 * 4 = 16
     config.train.train_batch_size = 4

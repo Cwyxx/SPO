@@ -23,11 +23,19 @@ def spo_reward_aigi_detector_compare(scores, threshold, aigi_detector_weight):
     #     std = torch.std(scores, dim=0, keepdim=True)
     #     return (scores - mean) / (std + eps)
     
+    def min_max_normalize(tensor: torch.Tensor):
+        return (tensor - tensor.min()) / (tensor.max() - tensor.min() + 1e-8)
+    
     # reward_model_scores / aigi_detector_scores: num_sample_per_step, b
     reward_model_scores, aigi_detector_scores = scores
+    norm_reward = min_max_normalize(reward_model_scores)
+    norm_aigi = min_max_normalize(aigi_detector_scores)
+    
     # norm_reward = normalize_scores(reward_model_scores)
     # norm_aigi = normalize_scores(aigi_detector_scores)
     
     # weight_scores: num_sample_per_step, b
-    weight_scores = (1 - aigi_detector_weight) * reward_model_scores + aigi_detector_weight * aigi_detector_scores
+    weight_scores = (1 - aigi_detector_weight) * norm_reward + aigi_detector_weight * norm_aigi
+    
+    
     return preference_score_compare(weight_scores, threshold)
