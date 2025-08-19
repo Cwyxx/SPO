@@ -669,12 +669,12 @@ def main(_):
 
         ########## save ckpt and evaluation ##########
         if accelerator.is_main_process:
-            if global_step % config.train.save_global_step_interval == 0:
-                accelerator.save_state(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}'))
-                with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{global_step}', 'global_step.json'), 'w') as f:
+            if (epoch + 1) % config.eval_interval == 0 or TERMINATE:
+                accelerator.save_state(os.path.join(config.logdir, config.run_name, f'checkpoint_{epoch}'))
+                with open(os.path.join(config.logdir, config.run_name, f'checkpoint_{epoch}', 'global_step.json'), 'w') as f:
                     json.dump({'global_step': global_step}, f)
                     
-            if  global_step % config.train.eval_global_step_interval == 0 and config.validation_prompts is not None:
+            if  ((epoch + 1) % config.save_interval == 0 and config.validation_prompts is not None) or TERMINATE:
                 prompt_info = f"Running validation... \n Generating {config.num_validation_images} images with prompt:\n"
                 for prompt in config.validation_prompts:
                     prompt_info = prompt_info + prompt + '\n'
