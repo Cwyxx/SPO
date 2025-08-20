@@ -10,11 +10,15 @@ def exp_config():
     # config.preference_model_func_cfg = dict(
     #     type="hpsv2_preference_model_func"
     # )
-    aigi_detector = "dinov2-full_train"
+    aigi_detector_path_dict = {
+        "fatformer" : "/data_center/data2/dataset/chenwy/21164-data/detection-method-ckpt/FatFormer/fatformer_4class_ckpt.pth",
+        "dinov2-full_train": "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/dinov2-full_train/genimage/best_model/model.safetensors"
+    }
+    aigi_detector = "fatformer"
     config.preference_model_func_cfg = dict(
         type="aigi_detector_preference_model_func",
         aigi_detector=f"{aigi_detector}",
-        aigi_detector_path=f"/data_center/data2/dataset/chenwy/21164-data/model-ckpt/{aigi_detector}/genimage/best_model/model.safetensors"
+        aigi_detector_path=aigi_detector_path_dict[aigi_detector]
     )
     
     ###### Training ######

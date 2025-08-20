@@ -161,6 +161,9 @@ def aigi_detector_preference_model_func_builder(cfg):
     if cfg.aigi_detector == "univfd":
         from aigi_detector_training.univfd import UnivFD
         aigi_detector = UnivFD("openai/clip-vit-large-patch14")
+        ckpt = safetensors.torch.load_file(cfg.aigi_detector_path)
+        aigi_detector.load_state_dict(ckpt)
+        
         _transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
             torchvision.transforms.CenterCrop(224),
@@ -169,25 +172,50 @@ def aigi_detector_preference_model_func_builder(cfg):
     elif cfg.aigi_detector.startswith("dinov2"):
         from aigi_detector_training.dinov2 import Dinov2
         aigi_detector = Dinov2("facebook/dinov2-base")
+        ckpt = safetensors.torch.load_file(cfg.aigi_detector_path)
+        aigi_detector.load_state_dict(ckpt)
+        
         _transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
             torchvision.transforms.CenterCrop(224),
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
-    ckpt = safetensors.torch.load_file(cfg.aigi_detector_path)
-    aigi_detector.load_state_dict(ckpt)
+    elif cfg.aigi_detector == "fatformer":
+        from .fatformer_models import build_model as fatformer_build_model
+        cfg.backbone = "CLIP:ViT-L/14"
+        cfg.num_classes = 2
+        cfg.num_vit_adapter = 8
+        cfg.num_context_embedding = 8
+        cfg.init_context_embedding = ""
+        cfg.hidden_dim = 768
+        cfg.clip_vision_width = 1024
+        cfg.frequency_encoder_layer = 2
+        cfg.decoder_layer = 4
+        cfg.num_heads = 12
+        aigi_detector = fatformer_build_model(cfg)
+        ckpt = torch.load(cfg.aigi_detector_path, map_location='cpu')
+        aigi_detector.load_state_dict(ckpt['model'], strict=False)
+        
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        
     aigi_detector.eval().to(cfg.device).requires_grad_(False)
     
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()# [B, C, H, W]
-        
         img_transformed = _transform(img)
         
         logits = aigi_detector(img_transformed)
-        outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
+        if cfg.aigi_detector in [ "fatformer" ] :
+            outputs = logits.softmax(dim=1)[:, 1].reshape(-1, 1) # [B, 1], 0 -> real, 1 -> fake
+        else:
+            outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
+            
         scores = 1 - outputs
-        
         return scores
     
     return preference_fn
