@@ -203,14 +203,29 @@ def aigi_detector_preference_model_func_builder(cfg):
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
+    elif cfg.aigi_detector in [ "drct_convb-sdv14", "drct_clip-sdv14", "drct_convb-sdv21", "drct_clip-sdv21"]:
+        from .drct_models.models import get_models as drct_get_models
+        model_name_dict = { "drct_convb-sdv14": "convnext_base_in22k", "drct_convb-sdv21": "convnext_base_in22k", "drct_clip-sdv14": "clip-ViT-L-14", "drct_clip-sdv21": "clip-ViT-L-14" }
+        cfg.is_train = False
+        cfg.num_classes = 2
+        cfg.freeze_extractor = False
+        cfg.embedding_size = 1024
+        aigi_detector = drct_get_models(model_name=model_name_dict[cfg.aigi_detector], pretrained=cfg.is_train, num_classes=cfg.num_classes, freeze_extractor=cfg.freeze_extractor, embedding_size=cfg.embedding_size)
+        aigi_detector.load_state_dict(torch.load(cfg.aigi_detector_path, map_location='cpu'), strict=False)
+        
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        
     aigi_detector.eval().to(cfg.device).requires_grad_(False)
-    
+
     def preference_fn(img, extra_info):
         img = (img / 2 + 0.5).clamp(0, 1).float()# [B, C, H, W]
         img_transformed = _transform(img)
         
         logits = aigi_detector(img_transformed)
-        if cfg.aigi_detector in [ "fatformer" ] :
+        if cfg.aigi_detector in [ "fatformer", "drct_convb", "drct_clip" ] :
             outputs = logits.softmax(dim=1)[:, 1].reshape(-1, 1) # [B, 1], 0 -> real, 1 -> fake
         else:
             outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake

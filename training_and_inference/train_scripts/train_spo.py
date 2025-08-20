@@ -449,7 +449,7 @@ def main(_):
                     step=global_step,
                 )
                 # apply early stop.
-                if global_step > config.train.early_stop_warmup_step and config.train.early_stop_threshold is not None and aigi_detector_score_logs.mean().item() > config.train.early_stop_threshold:
+                if epoch > 0 and config.train.early_stop_threshold is not None and aigi_detector_score_logs.mean().item() > config.train.early_stop_threshold:
                     if global_step - exced_early_stop_threshold_step < 200:
                         TERMINATE = True
                     exced_early_stop_threshold_step = global_step
@@ -465,7 +465,7 @@ def main(_):
                     step=global_step,
                 )
                 # apply early stop.
-                if global_step > config.train.early_stop_warmup_step and config.train.early_stop_threshold is not None and preference_score_logs.mean().item() > config.train.early_stop_threshold:
+                if epoch > 0 and config.train.early_stop_threshold is not None and preference_score_logs.mean().item() > config.train.early_stop_threshold:
                     if global_step - exced_early_stop_threshold_step < 200:
                         TERMINATE = True
                     exced_early_stop_threshold_step = global_step
@@ -713,15 +713,17 @@ def main(_):
                     train_loss = 0.0
                     train_ratio_win = 0.0
                     train_ratio_lose = 0.0
+                
+                if (train_batch_idx + 1) % config.train.save_and_eval_batch_interval == 0:
+                    save_and_evaluation(accelerator, unet, pipeline, config, epoch, global_step)
+                    TERMINATE = True
+                    break
 
             if (
                 dataset_batch_idx == len(data_loader) - 1 and 
                 accelerator.gradient_state.in_dataloader
             ):
                 accelerator.gradient_state.active_dataloader.end_of_dataloader = True
-            
-            if train_batch_idx % config.train.save_and_eval_batch_interval == 0:
-                save_and_evaluation(accelerator, unet, pipeline, config, epoch, global_step)
         
         ##########  TERMINATE ########## 
         if TERMINATE:
