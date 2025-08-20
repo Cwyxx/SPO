@@ -32,6 +32,7 @@ def exp_config():
     # total_train_batch_size = 4 * 1 * 4 = 16
     config.train.early_stop_threshold = 0.4
     config.train.early_stop_warmup_step = 4000
+    config.train.save_and_eval_batch_interval = 250
     config.logdir = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/spo"
     config.run_name = f"{aigi_detector}"# config.run_name = "spo_sd-v1-5_4k-prompts_num-sam-4_10ep_bs10"
     config.resume_from = None
