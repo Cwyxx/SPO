@@ -225,7 +225,7 @@ def aigi_detector_preference_model_func_builder(cfg):
         img_transformed = _transform(img)
         
         logits = aigi_detector(img_transformed)
-        if cfg.aigi_detector in [ "fatformer", "drct_convb", "drct_clip" ] :
+        if cfg.aigi_detector in [ "fatformer", "drct_convb-sdv14", "drct_clip-sdv14", "drct_convb-sdv21", "drct_clip-sdv21" ] :
             outputs = logits.softmax(dim=1)[:, 1].reshape(-1, 1) # [B, 1], 0 -> real, 1 -> fake
         else:
             outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
