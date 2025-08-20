@@ -12,6 +12,7 @@ def exp_config():
     # )
     aigi_detector_path_dict = {
         "fatformer" : "/data_center/data2/dataset/chenwy/21164-data/detection-method-ckpt/FatFormer/fatformer_4class_ckpt.pth",
+        "dinov2": "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/dinov2/genimage/best_model/model.safetensors",
         "dinov2-full_train": "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/dinov2-full_train/genimage/best_model/model.safetensors"
     }
     aigi_detector = "fatformer"
