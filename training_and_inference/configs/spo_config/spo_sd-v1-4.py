@@ -10,7 +10,7 @@ def exp_config():
     # config.preference_model_func_cfg = dict(
     #     type="hpsv2_preference_model_func"
     # )
-    aigi_detector = "dinov2"
+    aigi_detector = "dinov2-full_train"
     config.preference_model_func_cfg = dict(
         type="aigi_detector_preference_model_func",
         aigi_detector=f"{aigi_detector}",

@@ -166,7 +166,7 @@ def aigi_detector_preference_model_func_builder(cfg):
             torchvision.transforms.CenterCrop(224),
             torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
-    elif cfg.aigi_detector == "dinov2":
+    elif cfg.aigi_detector.startswith("dinov2"):
         from aigi_detector_training.dinov2 import Dinov2
         aigi_detector = Dinov2("facebook/dinov2-base")
         _transform = torchvision.transforms.Compose([

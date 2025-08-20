@@ -311,6 +311,7 @@ def main(_):
         first_epoch = 0
         global_step = 0
     
+    exced_early_stop_threshold_step = 0
     TERMINATE = False
     for epoch in tqdm(
         range(first_epoch, config.num_epochs),
@@ -398,9 +399,10 @@ def main(_):
                 )
                 # apply early stop.
                 if global_step > config.train.early_stop_warmup_step and config.train.early_stop_threshold is not None and aigi_detector_score_logs.mean().item() > config.train.early_stop_threshold:
-                    accelerator.print(f"aigi_detector_score_logs.mean().item(): {aigi_detector_score_logs.mean().item()}")
-                    accelerator.print(f"config.train.early_stop_threshold: {config.train.early_stop_threshold:}")
-                    TERMINATE = True
+                    if global_step - exced_early_stop_threshold_step < 200:
+                        TERMINATE = True
+                    exced_early_stop_threshold_step = global_step
+                    
                 del reward_model_score_logs, aigi_detector_score_logs
             else:
                 preference_score_logs = accelerator.gather(preference_score_logs).detach()
@@ -413,9 +415,9 @@ def main(_):
                 )
                 # apply early stop.
                 if global_step > config.train.early_stop_warmup_step and config.train.early_stop_threshold is not None and preference_score_logs.mean().item() > config.train.early_stop_threshold:
-                    accelerator.print(f"preference_score_logs.mean().item(): {preference_score_logs.mean().item()}")
-                    accelerator.print(f"config.train.early_stop_threshold: {config.train.early_stop_threshold:}")
-                    TERMINATE = True
+                    if global_step - exced_early_stop_threshold_step < 200:
+                        TERMINATE = True
+                    exced_early_stop_threshold_step = global_step
                 del preference_score_logs
             
             if TERMINATE:
