@@ -218,6 +218,16 @@ def aigi_detector_preference_model_func_builder(cfg):
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
+    elif cfg.aigi_detector == "CoDE":
+        from .code_models.models import VITContrastiveHF as CoDE_Model
+        cfg.classification_type = "linear"
+        aigi_detector = CoDE_Model(cfg.classification_type, cfg.aigi_detector_path)
+        
+        _transform = torchvision.transforms.Compose([
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        
     aigi_detector.eval().to(cfg.device).requires_grad_(False)
 
     def preference_fn(img, extra_info):
@@ -225,7 +235,7 @@ def aigi_detector_preference_model_func_builder(cfg):
         img_transformed = _transform(img)
         
         logits = aigi_detector(img_transformed)
-        if cfg.aigi_detector in [ "fatformer", "drct_convb-sdv14", "drct_clip-sdv14", "drct_convb-sdv21", "drct_clip-sdv21" ] :
+        if cfg.aigi_detector in [ "fatformer", "drct_convb-sdv14", "drct_clip-sdv14", "drct_convb-sdv21", "drct_clip-sdv21", "CoDE" ] :
             outputs = logits.softmax(dim=1)[:, 1].reshape(-1, 1) # [B, 1], 0 -> real, 1 -> fake
         else:
             outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake

@@ -54,14 +54,25 @@ class VITContrastiveHF(nn.Module):
 
         else:
             raise ValueError("Selected an invalid classifier")
+        
 
+    # forward_predict_proba
     def forward(self, x, return_feature=False):
         features = self.model(x)
         if return_feature:
             return features
         features = features.last_hidden_state[:, 0, :].cpu().detach().numpy()
-        predictions = self.classifier.predict(features)
+        predictions = self.classifier.predict_proba(features) # predictions = self.classifier.predict(features)
         return torch.from_numpy(predictions)
+    
+    # def forward_predict_label(self, x, return_feature=False):
+    #     features = self.model(x)
+    #     if return_feature:
+    #         return features
+    #     features = features.last_hidden_state[:, 0, :].cpu().detach().numpy()
+    #     predictions = self.classifier.predict(features)
+    #     return torch.from_numpy(predictions)
+    
 
 
 if __name__ == "__main__":
@@ -72,7 +83,7 @@ if __name__ == "__main__":
     # HF inference code
     classificator_type = "linear"
     model = VITContrastiveHF(
-        repo_name="aimagelab/CoDE", classificator_type=classificator_type
+        pretraiend_model="/data_center/data2/dataset/chenwy/21164-data/detection-method-ckpt/CoDE", classificator_type=classificator_type
     )
 
     transform = transforms.Compose(
@@ -86,14 +97,20 @@ if __name__ == "__main__":
     model.eval()
     model.model.to(device)
     y_pred = []
-    img = Image.open("206496010652.png").convert("RGB")
+    img_1 = Image.open("deepfake_model.jpg").convert("RGB")
+    img_2 = Image.open("deepfake_model.jpg").convert("RGB")
 
     with torch.no_grad():
         # in_tens = model.processor(img, return_tensors='pt')['pixel_values']
-        in_tens = transform(img).unsqueeze(0)
-
+        in_tens_1 = transform(img_1)
+        in_tens_2 = transform(img_2)
+        in_tens = torch.stack([in_tens_1, in_tens_2], dim=0)
+        
         in_tens = in_tens.to(device)
-        y_pred.extend(model(in_tens).flatten().tolist())
+        output = model(in_tens)
+        print(f"output:\n{output}")
+        print(f"output.shape:\n{output.shape}")
+        # y_pred.extend(model(in_tens).flatten().tolist())
 
     # check the correct label of the predict image
     for el in y_pred:
