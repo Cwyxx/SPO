@@ -101,7 +101,7 @@ def save_and_evaluation(accelerator, unet, pipeline, config, epoch, global_step)
                         for idx, image in enumerate(images):
                             image = swanlab.Image(image, caption=validation_prompt)
                             formatted_images.append(image)
-                    tracker.log({"validation": formatted_images})
+                    tracker.log({"validation": formatted_images}, step=global_step)
             unet.train()
             pipeline.unet.train()
             torch.cuda.empty_cache()
@@ -714,10 +714,8 @@ def main(_):
                     train_ratio_win = 0.0
                     train_ratio_lose = 0.0
                 
-                if (train_batch_idx + 1) % config.train.save_and_eval_batch_interval == 0:
-                    save_and_evaluation(accelerator, unet, pipeline, config, epoch, global_step)
-                    TERMINATE = True
-                    break
+            if (dataset_batch_idx + 1) % config.train.save_and_eval_batch_interval == 0:
+                save_and_evaluation(accelerator, unet, pipeline, config, epoch, global_step)
 
             if (
                 dataset_batch_idx == len(data_loader) - 1 and 
