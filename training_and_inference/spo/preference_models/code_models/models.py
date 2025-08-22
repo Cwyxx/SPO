@@ -58,12 +58,13 @@ class VITContrastiveHF(nn.Module):
 
     # forward_predict_proba
     def forward(self, x, return_feature=False):
+        device = next(self.model.parameters()).device
         features = self.model(x)
         if return_feature:
             return features
         features = features.last_hidden_state[:, 0, :].cpu().detach().numpy()
         predictions = self.classifier.predict_proba(features) # predictions = self.classifier.predict(features)
-        return torch.from_numpy(predictions)
+        return torch.from_numpy(predictions).to(device)
     
     # def forward_predict_label(self, x, return_feature=False):
     #     features = self.model(x)

@@ -15,43 +15,44 @@ def exp_config():
     
     ###### Preference Model ######
     config.bool_spo_reward_aigi_detector_func = True
-    config.preference_model = "hpsv2"
-    config.aigi_detector = "dinov2"
-    config.aigi_detector_weight = 0.1
+    preference_model = "hpsv2"
+    aigi_detector = "drct_clip-sdv14"
+    return_label = False
     config.preference_model_func_cfg = dict(
         type="spo_reward_aigi_detector_func",
         reward_model_func_cfg=dict(
-            type=f"{config.preference_model}_preference_model_func",
+            type=f"{preference_model}_preference_model_func",
         ),
         aigi_detector_func_cfg=dict(
             type=f"aigi_detector_preference_model_func", 
-            aigi_detector=f"{config.aigi_detector}",
-            aigi_detector_path=f"/data_center/data2/dataset/chenwy/21164-data/model-ckpt/{config.aigi_detector}/genimage/best_model/model.safetensors"
+            aigi_detector=f"{aigi_detector}",
+            aigi_detector_path=config.aigi_detector_path_dict[aigi_detector],
+            return_label=return_label
         )
     )
     
     ###### Compare Function ######
-    compare_func_threshold = 1e-2
+    aigi_detector_weight = 0.5
+    compare_func_threshold = 0
     config.compare_func_cfg = dict(
         type="spo_reward_aigi_detector_compare",
         threshold=compare_func_threshold,
-        aigi_detector_weight=config.aigi_detector_weight
+        aigi_detector_weight=aigi_detector_weight
     )
     
     
     ###### Training ######
-    config.train.early_stop_threshold = 0.4
     config.sample.num_sample_each_step = 4
-    # total_train_batch_size = 4 * 1 * 4 = 16
     config.train.train_batch_size = 4
-    config.train.gradient_accumulation_steps = 1
-    config.resume_from = "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/spo/spo-hpsv2_0.9-dinov2_0.1-comp_func_threshold_0.01/checkpoint_0"
-    config.num_epochs = 4
+    config.train.gradient_accumulation_steps = 1 # total_train_batch_size = 4 * 1 * 4 = 16
+    config.num_epochs = 2
     
     #### logging ####
-    config.wandb_project_name = "spo"
+    config.train.early_stop_threshold = None
+    config.train.save_and_eval_batch_interval = 250
+    config.wandb_project_name = 'spo-label' if return_label else 'spo'
     config.logdir = f"/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_4/spo_4k/{config.wandb_project_name}"
-    config.run_name = f"{config.wandb_project_name}-{config.preference_model}_{1-config.aigi_detector_weight}-{config.aigi_detector}_{config.aigi_detector_weight}-comp_func_threshold_{compare_func_threshold}"
+    config.run_name = f"{config.wandb_project_name}-{preference_model}_{1-aigi_detector_weight}-{aigi_detector}_{aigi_detector_weight}-comp_func_threshold_{compare_func_threshold}"
     config.validation_prompts = [ 'a cat.', 'a dog', 'a horse.', 'A bus stopped on the side of the road while people board it.', 'A woman holding a plate of cake in her hand.']
     config.num_validation_images = 1
     

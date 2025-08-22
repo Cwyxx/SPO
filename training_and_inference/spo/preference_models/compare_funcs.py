@@ -8,7 +8,7 @@ def preference_score_compare(scores, threshold):
     # 2, b
     indices = indices[[0, -1], :]
     scores = scores[[0, -1], :]
-    scores = scores.softmax(dim=0)
+    # scores = scores.softmax(dim=0)
     # b
     valid_samples = scores[0] - scores[1] > threshold
     return indices, valid_samples
