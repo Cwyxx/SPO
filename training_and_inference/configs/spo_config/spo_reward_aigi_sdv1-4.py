@@ -16,7 +16,7 @@ def exp_config():
     ###### Preference Model ######
     config.bool_spo_reward_aigi_detector_func = True
     preference_model = "hpsv2"
-    aigi_detector = "drct_clip-sdv14"
+    aigi_detector = "code"
     return_label = False
     config.preference_model_func_cfg = dict(
         type="spo_reward_aigi_detector_func",
@@ -45,7 +45,7 @@ def exp_config():
     config.sample.num_sample_each_step = 4
     config.train.train_batch_size = 4
     config.train.gradient_accumulation_steps = 1 # total_train_batch_size = 4 * 1 * 4 = 16
-    config.num_epochs = 2
+    config.num_epochs = 3
     
     #### logging ####
     config.train.early_stop_threshold = None

@@ -10,7 +10,7 @@ def exp_config():
     # config.preference_model_func_cfg = dict(
     #     type="hpsv2_preference_model_func"
     # )
-    aigi_detector = "drct_clip-sdv14"
+    aigi_detector = "drct_convb-sdv14"
     return_label = False
     config.preference_model_func_cfg = dict(
         type="aigi_detector_preference_model_func",
