@@ -441,10 +441,10 @@ def main(_):
                 aigi_detector_score_logs = accelerator.gather(aigi_detector_score_logs).detach()
                 accelerator.log(
                     {
-                        "reward_model_scores_mean": reward_model_score_logs.mean().item(),
-                        "reward_model_scores_std": reward_model_score_logs.std().item(),
-                        "aigi_detector_scores_mean": aigi_detector_score_logs.mean().item(),
-                        "aigi_detector_score_std": aigi_detector_score_logs.std().item(),
+                        "reward_model_scores_mean": reward_model_score_logs.float().mean().item(),
+                        "reward_model_scores_std": reward_model_score_logs.float().std().item(),
+                        "aigi_detector_scores_mean": aigi_detector_score_logs.float().mean().item(),
+                        "aigi_detector_score_std": aigi_detector_score_logs.float().std().item(),
                     },
                     step=global_step,
                 )
@@ -459,8 +459,8 @@ def main(_):
                 preference_score_logs = accelerator.gather(preference_score_logs).detach()
                 accelerator.log(
                     {
-                        "preference_scores_mean": preference_score_logs.mean().item(), 
-                        "preference_scores_std": preference_score_logs.std().item(),
+                        "preference_scores_mean": preference_score_logs.float().mean().item(), 
+                        "preference_scores_std": preference_score_logs.float().std().item(),
                     },
                     step=global_step,
                 )

@@ -245,7 +245,7 @@ def aigi_detector_preference_model_func_builder(cfg):
             outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
             
         if cfg.return_label:
-            outpus = ( outpus > 0.5 ).long()
+            outputs = ( outputs > 0.5 ).long()
             
         scores = 1 - outputs
         return scores

@@ -10,8 +10,8 @@ def exp_config():
     # config.preference_model_func_cfg = dict(
     #     type="hpsv2_preference_model_func"
     # )
-    aigi_detector = "drct_convb-sdv14"
-    return_label = False
+    aigi_detector = "drct_clip-sdv14"
+    return_label = True
     config.preference_model_func_cfg = dict(
         type="aigi_detector_preference_model_func",
         aigi_detector=f"{aigi_detector}",
@@ -23,7 +23,7 @@ def exp_config():
     config.sample.num_sample_each_step = 4
     config.train.train_batch_size = 4
     config.train.gradient_accumulation_steps = 1 # total_train_batch_size = 4 * 1 * 4 = 16
-    config.num_epochs = 2
+    config.num_epochs = 10
     
     #### logging ####
     config.train.early_stop_threshold = None

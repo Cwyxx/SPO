@@ -2,12 +2,14 @@ import os
 import sys
 current_dir = os.path.dirname(os.path.abspath(__file__)) # pick_a_pic_v1
 preference_model_dir = os.path.abspath(os.path.join(current_dir, "..", "..", "training_and_inference", "spo")) # preference_models
-grandparent_dir = osp.abspath(osp.join(current_dir, "..", "..")) # aigi_detector
+grandparent_dir = os.path.abspath(os.path.join(current_dir, "..", "..")) # aigi_detector
 sys.path.insert(0, preference_model_dir)
 import argparse
 import torch
 import torchvision
-
+from tqdm import tqdm
+import json
+from PIL import Image
 
 def get_aigi_detector_and_transform(cfg):
     import safetensors
@@ -20,6 +22,7 @@ def get_aigi_detector_and_transform(cfg):
         _transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
             torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
     elif cfg.aigi_detector.startswith("dinov2"):
@@ -31,6 +34,7 @@ def get_aigi_detector_and_transform(cfg):
         _transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
             torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
@@ -53,6 +57,7 @@ def get_aigi_detector_and_transform(cfg):
         _transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
             torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
@@ -68,6 +73,7 @@ def get_aigi_detector_and_transform(cfg):
         
         _transform = torchvision.transforms.Compose([
             torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
@@ -78,6 +84,7 @@ def get_aigi_detector_and_transform(cfg):
         
         _transform = torchvision.transforms.Compose([
             torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
@@ -105,3 +112,16 @@ aigi_detector, _transform = get_aigi_detector_and_transform(cfg)
 
 base_pick_a_pic_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick_a_pic_v1"
 pick_a_pic_id_list = os.listdir(base_pick_a_pic_dir)
+
+for id_dir in tqdm(pick_a_pic_id_list, total=len(pick_a_pic_id_list), dynamic_ncols=True, desc="Pick-a-Pic"):
+    with open(os.path.join(base_pick_a_pic_dir, id_dir, "info.json"), encoding="utf-8", mode="r") as info_file:
+        info_data = json.load(info_file)
+        
+    win_image_id, lose_image_id = info_data["win_image_id"], info_data["lose_image_id"]
+    win_image_path, lose_image_path = os.path.join(base_pick_a_pic_dir, id_dir, f"{win_image_id}.png"), os.path.join(base_pick_a_pic_dir, id_dir, f"{lose_image_id}.png")
+    win_image, lose_image = Image.open(win_image_path).convert("RGB"), Image.open(lose_image).convert("RGB")
+    win_image_t, lose_image_t = _transform(win_image), _transform(lose_image)
+    
+    input_tensors = torch.stack([win_image_t, lose_image_t], dim=0).to(cfg.device)
+    with torch.no_grad():
+        logits = aigi_detector(input_tensors)
