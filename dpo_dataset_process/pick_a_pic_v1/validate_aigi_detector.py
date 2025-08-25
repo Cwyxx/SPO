@@ -10,10 +10,13 @@ import torchvision
 from tqdm import tqdm
 import json
 from PIL import Image
+from sklearn.metrics import accuracy_score
+import numpy as np
+from types import SimpleNamespace
 
 def get_aigi_detector_and_transform(cfg):
     import safetensors
-    if aigi_detector == "univfd":
+    if cfg.aigi_detector == "univfd":
         from aigi_detector_training.univfd import UnivFD
         aigi_detector = UnivFD("openai/clip-vit-large-patch14")
         ckpt = safetensors.torch.load_file(cfg.aigi_detector_path)
@@ -104,24 +107,58 @@ aigi_detector_path_dict = {
     "drct_clip-sdv14": "/data_center/data2/dataset/chenwy/21164-data/detection-method-ckpt/DRCT/sdv14/clip-ViT-L-14_224_drct_amp_crop/13_acc0.9664.pth",
     "code": "/data_center/data2/dataset/chenwy/21164-data/detection-method-ckpt/CoDE"
 }
-cfg = {}
+cfg = SimpleNamespace()
 cfg.device = torch.device('cuda')
 cfg.aigi_detector = args.aigi_detector
 cfg.aigi_detector_path = aigi_detector_path_dict[cfg.aigi_detector]
 aigi_detector, _transform = get_aigi_detector_and_transform(cfg)
 
 base_pick_a_pic_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick_a_pic_v1"
-pick_a_pic_id_list = os.listdir(base_pick_a_pic_dir)
+pick_a_pic_id_list = os.listdir(base_pick_a_pic_dir)[0:1000]
 
+y_true_list = []
+win_pred_list, win_score_list = [], []
+lose_pred_list, lose_score_list = [], []
 for id_dir in tqdm(pick_a_pic_id_list, total=len(pick_a_pic_id_list), dynamic_ncols=True, desc="Pick-a-Pic"):
     with open(os.path.join(base_pick_a_pic_dir, id_dir, "info.json"), encoding="utf-8", mode="r") as info_file:
         info_data = json.load(info_file)
         
     win_image_id, lose_image_id = info_data["win_image_id"], info_data["lose_image_id"]
     win_image_path, lose_image_path = os.path.join(base_pick_a_pic_dir, id_dir, f"{win_image_id}.png"), os.path.join(base_pick_a_pic_dir, id_dir, f"{lose_image_id}.png")
-    win_image, lose_image = Image.open(win_image_path).convert("RGB"), Image.open(lose_image).convert("RGB")
+    win_image, lose_image = Image.open(win_image_path).convert("RGB"), Image.open(lose_image_path).convert("RGB")
     win_image_t, lose_image_t = _transform(win_image), _transform(lose_image)
     
     input_tensors = torch.stack([win_image_t, lose_image_t], dim=0).to(cfg.device)
     with torch.no_grad():
         logits = aigi_detector(input_tensors)
+        if cfg.aigi_detector in [ "fatformer", "drct_convb-sdv14", "drct_clip-sdv14", "drct_convb-sdv21", "drct_clip-sdv21" ] :
+            outputs = logits.softmax(dim=1)[:, 1].reshape(-1, 1) # [B, 1], 0 -> real, 1 -> fake
+            
+        elif cfg.aigi_detector == "code":
+            outputs = logits[:, 1].reshape(-1, 1) # [B, 1], 0 -> real, 1 -> fake
+        
+        else:
+            outputs = torch.sigmoid(logits).reshape(-1, 1) # 0 -> real, 1 -> fake
+        
+        y_true_list.append(1)
+        
+        win_score = outputs[0].item()
+        lose_score = outputs[1].item()
+        win_pred_label = int(win_score  > 0.5)
+        lose_pred_label = int(lose_score > 0.5)
+        
+        win_score_list.append(win_score)
+        lose_score_list.append(lose_score)
+        win_pred_list.append(win_pred_label)
+        lose_pred_list.append(lose_pred_label)
+
+print(f"aigi_detector: {cfg.aigi_detector}")
+print(f"(win, lose) image pair num: {len(y_true_list)}")
+print(f"average win socre: {sum(win_score_list) / len(win_score_list)}")
+print(f"average lose socre: {sum(lose_score_list) / len(lose_score_list)}")
+
+y_true_list, win_pred_list, lose_pred_list = np.array(y_true_list), np.array(win_pred_list), np.array(lose_pred_list)
+print(f"win image accuracy: {accuracy_score(y_true_list, win_pred_list):.4f}")
+print(f"lose image accuracy: {accuracy_score(y_true_list, lose_pred_list):.4f}")
+
+# CUDA_VISIBLE_DEVICES=3 python validate_aigi_detector.py --aigi_detector dinov2-full_train

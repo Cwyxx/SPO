@@ -501,6 +501,8 @@ def main(_):
             })
             
             if total_valid_samples_num < accelerator.num_processes:
+                if (dataset_batch_idx + 1) % config.train.save_and_eval_batch_interval == 0:
+                    save_and_evaluation(accelerator, unet, pipeline, config, epoch, global_step)
                 continue
             
             sample = {
